@@ -7,6 +7,9 @@ import Select from 'react-select'
 function App() {
 
   const [editMode, setEditMode] = useState(null) // number corresponds to block position in content array
+  const [editAuthor, setEditAuthor] = useState(false)
+  const [editTitle, setEditTitle] = useState(false)
+
   const [volume, setVolume] = useState('')
   const [edition, setEdition] = useState('')
   const [articles, setArticles] = useState([])
@@ -76,37 +79,100 @@ function App() {
             </ListGroup>
           </Row>
         </Col>
-        <Col md={8}>
+        <Col className="p-4" md={8} style={{'backgroundColor': '#fcf1dc'}}>
           {Object.keys(currentArticle).length > 0 && (
             <Row>
-              <h2 className="fw-bold fst-italic">{currentArticle.title}</h2>
-              <h4 className="fw-normal">{currentArticle.author.name}</h4>
+              {editTitle ? (
+                <div>
+                  <Form.Control as="text">{currentArticle.title}</Form.Control>
+                  <Row className="justify-content-start mt-2 mb-2">
+                    <Col md={1}>
+                      <Button variant="success">Submit</Button>
+                    </Col>
+                    <Col md={1} style={{'margin-left': '20px'}}>
+                      <Button variant="primary" onClick={() => setEditTitle(false)}>Cancel</Button>
+                    </Col>
+                  </Row>
+                </div>
+              ) : <h2 onClick={() => setEditTitle(true)} className="fw-bold fst-italic">{currentArticle.title}</h2>}
+              {editAuthor ? (
+                <div>
+                  <Form.Control as="text">{currentArticle.author.name}</Form.Control>
+                  <Row className="justify-content-start mt-2 mb-2">
+                    <Col md={1}>
+                      <Button variant="success">Submit</Button>
+                    </Col>
+                    <Col md={1} style={{'margin-left': '20px'}}>
+                      <Button variant="primary" onClick={() => setEditAuthor(false)}>Cancel</Button>
+                    </Col>
+                  </Row>
+                </div>
+              ) : <h4 onClick={() => setEditAuthor(true)} className="fw-normal">{currentArticle.author.name}</h4>}
               {currentArticle.content.map((block) => {
                 const blockIndex = currentArticle.content.indexOf(block)
                 if (block.type === "paragraph") {
-                  return <p onClick={() => setEditMode(blockIndex)}>
+                  return <div>
                     {editMode === blockIndex ? (
                       <div>
                         <Form.Control as="textarea" style={{'height': '100px'}}>{block.data.text}</Form.Control>
-                        <Row className="mt-2 justify-content-left">
-                          <Col md={2}>
+                        <Row className="mt-2 justify-content-center">
+                          <Col xs={2}>
                             <Button variant="success">Submit</Button>
                           </Col>
-                          <Col md={2} className="">
-                            <Button variant="danger">Delete Block</Button>
+                          <Col xs={2}>
+                            <Button variant="danger">Delete</Button>
                           </Col>
-                          <Col md={8}></Col>
+                          <Col xs={2}>
+                            <Button variant="primary" onClick={() => setEditMode(null)}>Cancel</Button>
+                          </Col>
                         </Row>
                       </div>
-                    ) : <p>{block.data.text}</p>}
-                  </p>
+                    ) : <p onClick={() => setEditMode(blockIndex)}>{block.data.text}</p>}
+                  </div>
                 } else if (block.type === "image") {
                   return <div>
-                          <img className="img-fluid" src={block.data.url} alt="Nobleman" />
-                          <p>{block.data.credit}</p>
-                        </div>
+                    {editMode === blockIndex ? (
+                      <>
+                          <img className="img-fluid" style={{'opacity': '0.5'}} src={block.data.url} alt="Nobleman" />
+                          <p className="text-center mt-2 fst-italic"><b>Credit:</b> {block.data.credit}</p>
+                          <Row className="mt-2 mb-3 justify-content-center">
+                            <Col xs={2}>
+                              <Button variant="success">Change Photo</Button>
+                            </Col>
+                            <Col xs={2}>
+                              <Button variant="danger">Delete</Button>
+                            </Col>
+                            <Col xs={2}>
+                              <Button variant="primary" onClick={() => setEditMode(null)}>Cancel</Button>
+                            </Col>
+                          </Row>
+                      </>
+                    ) : (
+                      <div onClick={() => setEditMode(blockIndex)}>
+                        <img className="img-fluid" src={block.data.url} alt="Nobleman" />
+                        <p className="text-center mt-2 fst-italic"><b>Credit:</b> {block.data.credit}</p>
+                      </div>
+                    )}
+                  </div>
                 } else if (block.type === "quote") {
-                  return <p className="fs-4 fst-italic">{block.data.text}</p>
+                  return <div>
+                    {editMode === blockIndex ? (
+                      <>
+                        <Form.Control as="textarea">{block.data.text}</Form.Control>
+                        <Row className="mt-2 mb-3 justify-content-center">
+                            <Col xs={2}>
+                              <Button variant="success">Submit</Button>
+                            </Col>
+                            <Col xs={2}>
+                              <Button variant="danger">Delete</Button>
+                            </Col>
+                            <Col xs={2}>
+                              <Button variant="primary" onClick={() => setEditMode(null)}>Cancel</Button>
+                            </Col>
+                          </Row>
+                      </>
+                    ) : <p onClick={() => setEditMode(blockIndex)} className="fs-4 fst-italic">{block.data.text}</p>}
+                  </div>
                 }
               })}
             </Row>
