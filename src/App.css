@@ -1,0 +1,12 @@
+.add-block {
+    opacity: 0;
+    transition: opacity 0.5s ease;
+}
+
+.add-block:hover {
+    opacity: 1;
+}
+
+.add-block:hover .add-block-button {
+    opacity: 1;
+}
