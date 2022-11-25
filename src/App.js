@@ -1,6 +1,6 @@
-import { useState, useEffect } from 'react'
+import { useState } from 'react'
 import { db } from './firebase'
-import { doc, getDoc } from 'firebase/firestore'
+import { doc, getDoc, updateDoc, query, collection, getDocs, where } from 'firebase/firestore'
 import { Col, Row, Container, Button, ListGroup, Form, Popover, OverlayTrigger, ButtonGroup } from 'react-bootstrap'
 import Select from 'react-select'
 import './App.css'
@@ -8,13 +8,18 @@ import './App.css'
 function App() {
 
   const [editMode, setEditMode] = useState(null) // number corresponds to block position in content array
-  const [editAuthor, setEditAuthor] = useState(false)
-  const [editTitle, setEditTitle] = useState(false)
+  const [editAuthorMode, setEditAuthorMode] = useState(false)
+  const [editTitleMode, setEditTitleMode] = useState(false)
 
 
   const [addParagraph, setAddParagraph] = useState(null)
   const [addImage, setAddImage] = useState(null)
   const [addQuote, setAddQuote] = useState(null)
+  
+  const [title, setTitle] = useState(null)
+  const [author, setAuthor] = useState(null)
+  const [paragraph, setParagraph] = useState(null)
+  const [quote, setQuote] = useState(null)
   const [image, setImage] = useState(null)
 
 
@@ -22,6 +27,7 @@ function App() {
   const [edition, setEdition] = useState('')
   const [articles, setArticles] = useState([])
   const [currentArticle, setCurrentArticle] = useState({})
+  const [currentArticleId, setCurrentArticleId] = useState(0)
 
   const volumes = [
     {value: '112', label: '112'},
@@ -46,16 +52,112 @@ function App() {
   }
 
   async function showArticle(article) {
-    const articleSnap = await getDoc(doc(db, 'volumes', volume, 'articles', article.tempId))  // TODO: Need to figure out how to pass temp ID
-    console.log()
-    console.log(articleSnap.data())
+    const articleSnap = await getDoc(doc(db, 'volumes', volume, 'articles', article.tempId))  // TODO: Need to figure out how to pass reference
     setCurrentArticle(articleSnap.data())
+    setCurrentArticleId(article.tempId)
   }
 
   function onImageChange(e) {
     const imageFile = e.target.files[0]
     setImage(URL.createObjectURL(imageFile));
   }
+
+  // Editing content functions
+  async function editTitle() {
+    const oldTitle = currentArticle.title
+    
+    // Update currentArticle state
+    setCurrentArticle({
+      ...currentArticle,
+      title: title,
+    })
+
+    // Update articles state
+    const articlesCopy = articles
+    articlesCopy.find(x => x.title === oldTitle).title = title
+    setArticles(articlesCopy)
+
+    // Update edition document on db
+    await updateDoc(doc(db, 'volumes', volume, 'editions', edition), {
+      articles: articles
+    })
+
+    // Update article document on db
+    await updateDoc(doc(db, 'volumes', volume, 'articles', currentArticleId), {
+      title: title
+    })
+
+    setTitle(null)
+    setEditTitleMode(false)
+  }
+
+
+  // TODO: Make sure to change ID to represent new author if it is new; check at start in authors collection
+  async function editAuthor() {
+    const oldAuthor = currentArticle.author
+
+    // Find author ID for new author
+    const querySnapshot = await getDocs(query(collection(db, 'volumes', volume, 'authors'), where('name', '==', oldAuthor.name)))
+    console.log(querySnapshot.docs[0])
+    
+    const newAuthorId = querySnapshot.docs[0].id
+
+    // TODO: Need some way to add the article to this author's doc and remove it from the other author's doc. Is this getting too complicated?
+
+    console.log(newAuthorId)
+
+    setCurrentArticle({
+      ...currentArticle,
+      author: {
+        name: author,
+        id: `volumes/${volume}/authors/${newAuthorId}`,
+      } 
+    })
+
+    console.log(currentArticle)
+
+    // Update articles state
+    const articlesCopy = articles
+    console.log(articlesCopy)
+
+    console.log(articlesCopy.find(x => x.author.name === oldAuthor.name))
+
+    articlesCopy.find(x => x.author.name === oldAuthor.name).author.name = author
+    setArticles(articlesCopy)
+
+    console.log(articles)
+
+    // Update edition document on db
+    await updateDoc(doc(db, 'volumes', volume, 'editions', edition), {
+      articles: articles
+    })
+
+    // Update article document on db
+    await updateDoc(doc(db, 'volumes', volume, 'articles', currentArticleId), {
+      author: {
+        name: author,
+        id: `volumes/${volume}/authors/${newAuthorId}`,
+      }
+    })
+
+    setAuthor(null)
+    setEditAuthorMode(false)
+  }
+
+
+  async function editParagraph(blockIndex) {
+
+  }
+
+  async function editQuote(blockIndex) {
+
+  }
+
+  async function editImage(blockIndex) {
+    
+  }
+
+
 
   return (
     <Container>
@@ -95,34 +197,42 @@ function App() {
         <Col className="p-4" md={8} style={{'backgroundColor': '#fcf1dc'}}>
           {Object.keys(currentArticle).length > 0 && (
             <Row>
-              {editTitle ? (
+
+              {/** TITLE */}
+              {editTitleMode ? (
                 <div>
-                  <Form.Control as="text">{currentArticle.title}</Form.Control>
+                  <Form.Control type="text" onChange={(e) => setTitle(e.target.value)} defaultValue={currentArticle.title}></Form.Control>
                   <Row className="justify-content-start mt-2 mb-2">
                     <Col md={1}>
-                      <Button variant="success">Submit</Button>
+                      <Button variant="success" onClick={() => editTitle()}>Submit</Button>
                     </Col>
                     <Col md={1} style={{'margin-left': '20px'}}>
-                      <Button variant="primary" onClick={() => setEditTitle(false)}>Cancel</Button>
+                      <Button variant="primary" onClick={() => setEditTitleMode(false)}>Cancel</Button>
                     </Col>
                   </Row>
                 </div>
-              ) : <h2 onClick={() => setEditTitle(true)} className="fw-bold fst-italic">{currentArticle.title}</h2>}
-              {editAuthor ? (
+              ) : <h2 onClick={() => setEditTitleMode(true)} className="fw-bold fst-italic">{currentArticle.title}</h2>}
+              
+              {/** AUTHOR */}
+              {editAuthorMode ? (
                 <div className="mb-3">
-                  <Form.Control as="text">{currentArticle.author.name}</Form.Control>
+                  <Form.Control type="text" onChange={(e) => setAuthor(e.target.value)} defaultValue={currentArticle.author.name}></Form.Control>
                   <Row className="justify-content-start mt-2 mb-2">
                     <Col md={1}>
-                      <Button variant="success">Submit</Button>
+                      <Button variant="success" onClick={() => editAuthor()}>Submit</Button>
                     </Col>
                     <Col md={1} style={{'margin-left': '20px'}}>
-                      <Button variant="primary" onClick={() => setEditAuthor(false)}>Cancel</Button>
+                      <Button variant="primary" onClick={() => setEditAuthorMode(false)}>Cancel</Button>
                     </Col>
                   </Row>
                 </div>
-              ) : <h4 onClick={() => setEditAuthor(true)} className="fw-normal mb-3">{currentArticle.author.name}</h4>}
+              ) : <h4 onClick={() => setEditAuthorMode(true)} className="fw-normal mb-3">{currentArticle.author.name}</h4>}
+              
+              {/** CONTENT */}
               {currentArticle.content.map((block) => {
                 const blockIndex = currentArticle.content.indexOf(block)
+
+                // PARAGRAPH
                 if (block.type === "paragraph") {
                   return <div>
                     {editMode === blockIndex ? (
@@ -193,6 +303,8 @@ function App() {
                       </>}
                     </>}
                   </div>
+
+                  // IMAGE
                 } else if (block.type === "image") {
                   return <div>
                     {editMode === blockIndex ? (
@@ -269,6 +381,8 @@ function App() {
                       </>
                     )}
                   </div>
+
+                  // QUOTE
                 } else if (block.type === "quote") {
                   return <div>
                     {editMode === blockIndex ? (
