@@ -98,13 +98,10 @@ function App() {
 
     // Find author ID for new author
     const querySnapshot = await getDocs(query(collection(db, 'volumes', volume, 'authors'), where('name', '==', oldAuthor.name)))
-    console.log(querySnapshot.docs[0])
     
     const newAuthorId = querySnapshot.docs[0].id
 
     // TODO: Need some way to add the article to this author's doc and remove it from the other author's doc. Is this getting too complicated?
-
-    console.log(newAuthorId)
 
     setCurrentArticle({
       ...currentArticle,
@@ -118,14 +115,9 @@ function App() {
 
     // Update articles state
     const articlesCopy = articles
-    console.log(articlesCopy)
-
-    console.log(articlesCopy.find(x => x.author.name === oldAuthor.name))
 
     articlesCopy.find(x => x.author.name === oldAuthor.name).author.name = author
     setArticles(articlesCopy)
-
-    console.log(articles)
 
     // Update edition document on db
     await updateDoc(doc(db, 'volumes', volume, 'editions', edition), {
@@ -146,16 +138,63 @@ function App() {
 
 
   async function editParagraph(blockIndex) {
+    // Update currentArticle
+    const articleCopy = currentArticle
+    articleCopy.content[blockIndex].data.text = paragraph
+    setCurrentArticle(articleCopy)
 
+    // Update article document on db
+    await updateDoc(doc(db, 'volumes', volume, 'articles', currentArticleId), currentArticle)
+
+    setParagraph(null)
+    setEditMode(null)
+  }
+
+  async function deleteParagraph(blockIndex) {
+    // Update currentArticle
+    const articleCopy = currentArticle
+    articleCopy.content.splice(blockIndex, 1)
+    setCurrentArticle(articleCopy)
+
+    // Update article document on db
+    await updateDoc(doc(db, 'volumes', volume, 'articles', currentArticleId), currentArticle)
+    setEditMode(null)
+  }
+
+  async function insertParagraph(insertIndex) {
+    // Update currentArticle
+    const articleCopy = currentArticle
+    const contentWithNewParagraph = [
+      ...currentArticle.content.slice(0, insertIndex),
+      { data: { text: paragraph }, type: 'paragraph'},
+      ...currentArticle.content.slice(insertIndex)
+    ]
+    articleCopy.content = contentWithNewParagraph
+    setCurrentArticle(articleCopy)
+
+    // Update article document on db
+    await updateDoc(doc(db, 'volumes', volume, 'articles', currentArticleId), currentArticle)
+    
+    setAddParagraph(null)
   }
 
   async function editQuote(blockIndex) {
+    // Update currentArticle
+    const articleCopy = currentArticle
+    articleCopy.content[blockIndex].data.text = quote
+    setCurrentArticle(articleCopy)
 
+    // Update article document on db
+    await updateDoc(doc(db, 'volumes', volume, 'articles', currentArticleId), currentArticle)
+
+    setQuote(null)
+    setEditMode(null)
   }
 
-  async function editImage(blockIndex) {
+  // TODO: Create editImage function (for now, delete and add)
+  // async function editImage(blockIndex) {
     
-  }
+  // }
 
 
 
@@ -195,7 +234,7 @@ function App() {
           </Row>
         </Col>
         <Col className="p-4" md={8} style={{'backgroundColor': '#fcf1dc'}}>
-          {Object.keys(currentArticle).length > 0 && (
+          {Object.keys(currentArticle).length > 0 && currentArticle.content && currentArticle.author && (
             <Row>
 
               {/** TITLE */}
@@ -228,6 +267,57 @@ function App() {
                 </div>
               ) : <h4 onClick={() => setEditAuthorMode(true)} className="fw-normal mb-3">{currentArticle.author.name}</h4>}
               
+              {/** FIRST ADD BLOCK */}
+              <Row className="add-block justify-content-center mt-2">
+                <hr></hr>
+                <Col className="add-block-button" md={1}>
+                  <OverlayTrigger trigger="click" placement="right" overlay={
+                    <Popover id="popover-basic">
+                      <Popover.Body>
+                        <ButtonGroup>
+                          <Button onClick={() => { setEditMode(null); setAddParagraph(0)} }>Paragraph</Button>
+                          <Button onClick={() => { setEditMode(null); setAddImage(0)} }>Image</Button>
+                          <Button onClick={() => { setEditMode(null); setAddQuote(0)} }>Quote</Button>
+                        </ButtonGroup>
+                      </Popover.Body>
+                    </Popover>}>
+                    <Button style={{'borderRadius': '50%', 'margin-top': '-60px'}} variant="info">+</Button>                          
+                  </OverlayTrigger>
+                  </Col>
+              </Row>
+              {addParagraph === 0 ? <>
+                <Form.Control as="textarea" onChange={(e) => setParagraph(e.target.value)}/>
+                <Row className="mt-2 mb-3 justify-content-center">
+                    <Col xs={2}>
+                      <Button variant="success" onClick={() => insertParagraph(0)}>Add</Button>
+                    </Col>
+                    <Col xs={2}>
+                      <Button variant="primary" onClick={() => setAddParagraph(null)}>Cancel</Button>
+                    </Col>
+                  </Row>
+              </> : addQuote === 0 ? <>
+                <Form.Control as="textarea" onChange={(e) => setQuote(e.target.value)}/>
+                <Row className="mt-2 mb-3 justify-content-center">
+                    <Col xs={2}>
+                      <Button variant="success">Add</Button>
+                    </Col>
+                    <Col xs={2}>
+                      <Button variant="primary" onClick={() => setAddQuote(null)}>Cancel</Button>
+                    </Col>
+                  </Row>
+              </> : addImage === 0 && <>
+                    {image && <img className="img-fluid" src={image} alt="Nobleman"/>}
+                    <input type="file" accept="image/*" onChange={onImageChange} />
+                    <Row className="mt-2 mb-3 justify-content-center">
+                      <Col xs={2}>
+                        <Button variant="success" disabled={image === null}>Add</Button>
+                      </Col>
+                      <Col xs={2}>
+                        <Button variant="primary" onClick={() => { setAddImage(null); setImage(null) }}>Cancel</Button>
+                      </Col>
+                    </Row>
+              </>}
+
               {/** CONTENT */}
               {currentArticle.content.map((block) => {
                 const blockIndex = currentArticle.content.indexOf(block)
@@ -237,13 +327,13 @@ function App() {
                   return <div>
                     {editMode === blockIndex ? (
                       <>
-                        <Form.Control as="textarea" style={{'height': '100px'}}>{block.data.text}</Form.Control>
+                        <Form.Control as="textarea" style={{'height': '100px'}} onChange={(e) => setParagraph(e.target.value)} defaultValue={block.data.text} />
                         <Row className="mt-2 justify-content-center">
                           <Col xs={2}>
-                            <Button variant="success">Submit</Button>
+                            <Button variant="success" onClick={() => editParagraph(blockIndex)}>Submit</Button>
                           </Col>
                           <Col xs={2}>
-                            <Button variant="danger">Delete</Button>
+                            <Button variant="danger" onClick={() => deleteParagraph(blockIndex)}>Delete</Button>
                           </Col>
                           <Col xs={2}>
                             <Button variant="primary" onClick={() => setEditMode(null)}>Cancel</Button>
@@ -251,7 +341,7 @@ function App() {
                         </Row>
                       </>
                     ) : <>
-                      <p onClick={() => setEditMode(blockIndex)}>{block.data.text}</p>
+                      <p onClick={() => { setAddParagraph(null); setEditMode(blockIndex) }}>{block.data.text}</p>
                       <Row className="add-block justify-content-center mt-2">
                         <hr></hr>
                         <Col className="add-block-button" md={1}>
@@ -259,9 +349,9 @@ function App() {
                             <Popover id="popover-basic">
                               <Popover.Body>
                                 <ButtonGroup>
-                                  <Button onClick={() => setAddParagraph(blockIndex)}>Paragraph</Button>
-                                  <Button onClick={() => setAddImage(blockIndex)}>Image</Button>
-                                  <Button onClick={() => setAddQuote(blockIndex)}>Quote</Button>
+                                  <Button onClick={() => { setEditMode(null); setAddParagraph(blockIndex + 1)} }>Paragraph</Button>
+                                  <Button onClick={() => { setEditMode(null); setAddImage(blockIndex + 1)} }>Image</Button>
+                                  <Button onClick={() => { setEditMode(null); setAddQuote(blockIndex + 1)} }>Quote</Button>
                                 </ButtonGroup>
                               </Popover.Body>
                             </Popover>}>
@@ -269,32 +359,32 @@ function App() {
                           </OverlayTrigger>
                           </Col>
                       </Row>
-                      {addParagraph === blockIndex ? <>
-                        <Form.Control as="textarea"></Form.Control>
+                      {addParagraph === blockIndex + 1 ? <>
+                        <Form.Control as="textarea" onChange={(e) => setParagraph(e.target.value)}/>
                         <Row className="mt-2 mb-3 justify-content-center">
                             <Col xs={2}>
-                              <Button variant="success">Add Content</Button>
+                              <Button variant="success" onClick={() => insertParagraph(blockIndex + 1)}>Add</Button>
                             </Col>
                             <Col xs={2}>
                               <Button variant="primary" onClick={() => setAddParagraph(null)}>Cancel</Button>
                             </Col>
                           </Row>
-                      </> : addQuote === blockIndex ? <>
-                        <Form.Control as="textarea"></Form.Control>
+                      </> : addQuote === blockIndex + 1 ? <>
+                        <Form.Control as="textarea" onChange={(e) => setQuote(e.target.value)}/>
                         <Row className="mt-2 mb-3 justify-content-center">
                             <Col xs={2}>
-                              <Button variant="success">Add Content</Button>
+                              <Button variant="success">Add</Button>
                             </Col>
                             <Col xs={2}>
                               <Button variant="primary" onClick={() => setAddQuote(null)}>Cancel</Button>
                             </Col>
                           </Row>
-                      </> : addImage === blockIndex && <>
+                      </> : addImage === blockIndex + 1 && <>
                             {image && <img className="img-fluid" src={image} alt="Nobleman"/>}
                             <input type="file" accept="image/*" onChange={onImageChange} />
                             <Row className="mt-2 mb-3 justify-content-center">
                               <Col xs={2}>
-                                <Button variant="success" disabled={image === null}>Add Content</Button>
+                                <Button variant="success" disabled={image === null}>Add</Button>
                               </Col>
                               <Col xs={2}>
                                 <Button variant="primary" onClick={() => { setAddImage(null); setImage(null) }}>Cancel</Button>
@@ -336,9 +426,9 @@ function App() {
                               <Popover id="popover-basic">
                                 <Popover.Body>
                                   <ButtonGroup>
-                                    <Button onClick={() => setAddParagraph(blockIndex)}>Paragraph</Button>
-                                    <Button onClick={() => setAddImage(blockIndex)}>Image</Button>
-                                    <Button onClick={() => setAddQuote(blockIndex)}>Quote</Button>
+                                    <Button onClick={() => setAddParagraph(blockIndex + 1)}>Paragraph</Button>
+                                    <Button onClick={() => setAddImage(blockIndex + 1)}>Image</Button>
+                                    <Button onClick={() => setAddQuote(blockIndex + 1)}>Quote</Button>
                                   </ButtonGroup>
                                 </Popover.Body>
                               </Popover>}>
@@ -346,32 +436,32 @@ function App() {
                             </OverlayTrigger>
                             </Col>
                         </Row>
-                        {addParagraph === blockIndex ? <>
-                        <Form.Control as="textarea"></Form.Control>
+                        {addParagraph === blockIndex + 1 ? <>
+                          <Form.Control as="textarea" onChange={(e) => setParagraph(e.target.value)}/>
                           <Row className="mt-2 mb-3 justify-content-center">
                               <Col xs={2}>
-                                <Button variant="success">Add Content</Button>
+                                <Button variant="success" onClick={() => insertParagraph(blockIndex + 1)}>Add</Button>
                               </Col>
                               <Col xs={2}>
                                 <Button variant="primary" onClick={() => setAddParagraph(null)}>Cancel</Button>
                               </Col>
                             </Row>
-                        </> : addQuote === blockIndex ? <>
-                          <Form.Control as="textarea"></Form.Control>
+                        </> : addQuote === blockIndex + 1 ? <>
+                          <Form.Control as="textarea" onChange={(e) => setQuote(e.target.value)}/>
                           <Row className="mt-2 mb-3 justify-content-center">
                               <Col xs={2}>
-                                <Button variant="success">Add Content</Button>
+                                <Button variant="success">Add</Button>
                               </Col>
                               <Col xs={2}>
                                 <Button variant="primary" onClick={() => setAddQuote(null)}>Cancel</Button>
                               </Col>
                             </Row>
-                        </> : addImage === blockIndex && <>
+                        </> : addImage === blockIndex + 1 && <>
                               {image && <img className="img-fluid" src={image} alt="Nobleman"/>}
                               <input type="file" accept="image/*" onChange={onImageChange} />
                               <Row className="mt-2 mb-3 justify-content-center">
                                 <Col xs={2}>
-                                  <Button variant="success" disabled={image === null}>Add Content</Button>
+                                  <Button variant="success" disabled={image === null}>Add</Button>
                                 </Col>
                                 <Col xs={2}>
                                   <Button variant="primary" onClick={() => { setAddImage(null); setImage(null) }}>Cancel</Button>
@@ -387,10 +477,10 @@ function App() {
                   return <div>
                     {editMode === blockIndex ? (
                       <>
-                        <Form.Control as="textarea">{block.data.text}</Form.Control>
+                        <Form.Control as="textarea" defaultValue={block.data.text} onChange={(e) => setQuote(e.target.value)} />
                         <Row className="mt-2 mb-3 justify-content-center">
                             <Col xs={2}>
-                              <Button variant="success">Submit</Button>
+                              <Button variant="success" onClick={() => editQuote(blockIndex)}>Submit</Button>
                             </Col>
                             <Col xs={2}>
                               <Button variant="danger">Delete</Button>
@@ -409,9 +499,9 @@ function App() {
                               <Popover id="popover-basic">
                                 <Popover.Body>
                                   <ButtonGroup>
-                                    <Button onClick={() => setAddParagraph(blockIndex)}>Paragraph</Button>
-                                    <Button onClick={() => setAddImage(blockIndex)}>Image</Button>
-                                    <Button onClick={() => setAddQuote(blockIndex)}>Quote</Button>
+                                    <Button onClick={() => setAddParagraph(blockIndex + 1)}>Paragraph</Button>
+                                    <Button onClick={() => setAddImage(blockIndex + 1)}>Image</Button>
+                                    <Button onClick={() => setAddQuote(blockIndex + 1)}>Quote</Button>
                                   </ButtonGroup>
                                 </Popover.Body>
                               </Popover>}>
@@ -419,32 +509,32 @@ function App() {
                             </OverlayTrigger>
                             </Col>
                         </Row>
-                        {addParagraph === blockIndex ? <>
-                        <Form.Control as="textarea"></Form.Control>
+                        {addParagraph === blockIndex + 1 ? <>
+                          <Form.Control as="textarea" onChange={(e) => setParagraph(e.target.value)}/>
                           <Row className="mt-2 mb-3 justify-content-center">
                               <Col xs={2}>
-                                <Button variant="success">Add Content</Button>
+                                <Button variant="success" onClick={() => insertParagraph(blockIndex + 1)}>Add</Button>
                               </Col>
                               <Col xs={2}>
                                 <Button variant="primary" onClick={() => setAddParagraph(null)}>Cancel</Button>
                               </Col>
                             </Row>
-                        </> : addQuote === blockIndex ? <>
-                          <Form.Control as="textarea"></Form.Control>
+                        </> : addQuote === blockIndex + 1 ? <>
+                          <Form.Control as="textarea" onChange={(e) => setQuote(e.target.value)}/>
                           <Row className="mt-2 mb-3 justify-content-center">
                               <Col xs={2}>
-                                <Button variant="success">Add Content</Button>
+                                <Button variant="success">Add</Button>
                               </Col>
                               <Col xs={2}>
                                 <Button variant="primary" onClick={() => setAddQuote(null)}>Cancel</Button>
                               </Col>
                             </Row>
-                        </> : addImage === blockIndex && <>
+                        </> : addImage === blockIndex + 1 && <>
                               {image && <img className="img-fluid" src={image} alt="Nobleman"/>}
                               <input type="file" accept="image/*" onChange={onImageChange} />
                               <Row className="mt-2 mb-3 justify-content-center">
                                 <Col xs={2}>
-                                  <Button variant="success" disabled={image === null}>Add Content</Button>
+                                  <Button variant="success" disabled={image === null}>Add</Button>
                                 </Col>
                                 <Col xs={2}>
                                   <Button variant="primary" onClick={() => { setAddImage(null); setImage(null) }}>Cancel</Button>
