@@ -175,6 +175,7 @@ function App() {
     // Update article document on db
     await updateDoc(doc(db, 'volumes', volume, 'articles', currentArticleId), currentArticle)
     
+    setParagraph(null)
     setAddParagraph(null)
   }
 
@@ -190,6 +191,36 @@ function App() {
     setQuote(null)
     setEditMode(null)
   }
+
+  async function deleteQuote(blockIndex) {
+    // Update currentArticle
+    const articleCopy = currentArticle
+    articleCopy.content.splice(blockIndex, 1)
+    setCurrentArticle(articleCopy)
+
+    // Update article document on db
+    await updateDoc(doc(db, 'volumes', volume, 'articles', currentArticleId), currentArticle)
+    setEditMode(null)
+  }
+
+  async function insertQuote(insertIndex) {
+    // Update currentArticle
+    const articleCopy = currentArticle
+    const contentWithNewQuote = [
+      ...currentArticle.content.slice(0, insertIndex),
+      { data: { text: quote }, type: 'quote'},
+      ...currentArticle.content.slice(insertIndex)
+    ]
+    articleCopy.content = contentWithNewQuote
+    setCurrentArticle(articleCopy)
+
+    // Update article document on db
+    await updateDoc(doc(db, 'volumes', volume, 'articles', currentArticleId), currentArticle)
+    
+    setQuote(null)
+    setAddQuote(null)
+  }
+
 
   // TODO: Create editImage function (for now, delete and add)
   // async function editImage(blockIndex) {
@@ -299,7 +330,7 @@ function App() {
                 <Form.Control as="textarea" onChange={(e) => setQuote(e.target.value)}/>
                 <Row className="mt-2 mb-3 justify-content-center">
                     <Col xs={2}>
-                      <Button variant="success">Add</Button>
+                      <Button variant="success" onClick={() => insertQuote(0)}>Add</Button>
                     </Col>
                     <Col xs={2}>
                       <Button variant="primary" onClick={() => setAddQuote(null)}>Cancel</Button>
@@ -373,7 +404,7 @@ function App() {
                         <Form.Control as="textarea" onChange={(e) => setQuote(e.target.value)}/>
                         <Row className="mt-2 mb-3 justify-content-center">
                             <Col xs={2}>
-                              <Button variant="success">Add</Button>
+                              <Button variant="success" onClick={() => insertQuote(blockIndex + 1)}>Add</Button>
                             </Col>
                             <Col xs={2}>
                               <Button variant="primary" onClick={() => setAddQuote(null)}>Cancel</Button>
@@ -450,7 +481,7 @@ function App() {
                           <Form.Control as="textarea" onChange={(e) => setQuote(e.target.value)}/>
                           <Row className="mt-2 mb-3 justify-content-center">
                               <Col xs={2}>
-                                <Button variant="success">Add</Button>
+                                <Button variant="success" onClick={() => insertQuote(blockIndex + 1)}>Add</Button>
                               </Col>
                               <Col xs={2}>
                                 <Button variant="primary" onClick={() => setAddQuote(null)}>Cancel</Button>
@@ -483,7 +514,7 @@ function App() {
                               <Button variant="success" onClick={() => editQuote(blockIndex)}>Submit</Button>
                             </Col>
                             <Col xs={2}>
-                              <Button variant="danger">Delete</Button>
+                              <Button variant="danger" onClick={() => deleteQuote(blockIndex)}>Delete</Button>
                             </Col>
                             <Col xs={2}>
                               <Button variant="primary" onClick={() => setEditMode(null)}>Cancel</Button>
@@ -523,7 +554,7 @@ function App() {
                           <Form.Control as="textarea" onChange={(e) => setQuote(e.target.value)}/>
                           <Row className="mt-2 mb-3 justify-content-center">
                               <Col xs={2}>
-                                <Button variant="success">Add</Button>
+                                <Button variant="success" onClick={() => insertQuote(blockIndex + 1)}>Add</Button>
                               </Col>
                               <Col xs={2}>
                                 <Button variant="primary" onClick={() => setAddQuote(null)}>Cancel</Button>
