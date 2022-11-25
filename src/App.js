@@ -55,9 +55,9 @@ function App() {
   }
 
   async function showArticle(article) {
-    const articleSnap = await getDoc(doc(db, 'volumes', volume, 'articles', article.tempId))  // TODO: Need to figure out how to pass reference
+    const articleSnap = await getDoc(doc(db, article.id.path))
     setCurrentArticle(articleSnap.data())
-    setCurrentArticleId(article.tempId)
+    setCurrentArticleId(article.id.path.split('/').at(-1))
   }
 
   function onImageChange(e) {
