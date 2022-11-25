@@ -1,6 +1,7 @@
 import { useState } from 'react'
-import { db } from './firebase'
+import { db, storage } from './firebase'
 import { doc, getDoc, updateDoc, query, collection, getDocs, where } from 'firebase/firestore'
+import { deleteObject, ref, uploadBytes, getDownloadURL } from 'firebase/storage'
 import { Col, Row, Container, Button, ListGroup, Form, Popover, OverlayTrigger, ButtonGroup } from 'react-bootstrap'
 import Select from 'react-select'
 import './App.css'
@@ -20,7 +21,9 @@ function App() {
   const [author, setAuthor] = useState(null)
   const [paragraph, setParagraph] = useState(null)
   const [quote, setQuote] = useState(null)
-  const [image, setImage] = useState(null)
+  const [imageURL, setImageURL] = useState(null)
+  const [imageFile, setImageFile] = useState(null)
+  const [credit, setCredit] = useState(null)
 
 
   const [volume, setVolume] = useState('')
@@ -58,8 +61,10 @@ function App() {
   }
 
   function onImageChange(e) {
-    const imageFile = e.target.files[0]
-    setImage(URL.createObjectURL(imageFile));
+    const file = e.target.files[0]
+
+    setImageURL(URL.createObjectURL(file));
+    setImageFile(file)
   }
 
   // Editing content functions
@@ -221,11 +226,52 @@ function App() {
     setAddQuote(null)
   }
 
-
   // TODO: Create editImage function (for now, delete and add)
-  // async function editImage(blockIndex) {
+  // async function editImage(blockIndex) { }
+
+  // TODO: Change security rules so that only authorized users can access it
+  async function insertImage(insertIndex) {
+    const imageRef = ref(storage, `noblemen/${volume}/${edition}/${currentArticleId}/${imageFile.name}`)
     
-  // }
+    // Upload image to Firebase Storage
+    await uploadBytes(imageRef, imageFile)
+    
+    // Get download URL and update article document
+    const url = await getDownloadURL(imageRef)
+
+    const articleCopy = currentArticle
+    const contentWithNewQuote = [
+      ...currentArticle.content.slice(0, insertIndex),
+      { data: { url: url, credit: credit }, type: 'image', name: imageFile.name},
+      ...currentArticle.content.slice(insertIndex)
+    ]
+    articleCopy.content = contentWithNewQuote
+    setCurrentArticle(articleCopy)
+
+    await updateDoc(doc(db, 'volumes', volume, 'articles', currentArticleId), currentArticle)
+
+    setImageFile(null)
+    setImageURL(null)
+    setCredit(null)
+    setAddImage(null)
+  }
+
+  async function deleteImage(blockIndex) {
+    // Delete on storage
+    const imageRef = ref(storage, `noblemen/${volume}/${edition}/${currentArticleId}/${currentArticle.content[blockIndex].name}`)
+    await deleteObject(imageRef)
+    
+    // Update currentArticle
+    const articleCopy = currentArticle
+    articleCopy.content.splice(blockIndex, 1)
+    setCurrentArticle(articleCopy)
+
+    // Update article document on db
+    await updateDoc(doc(db, 'volumes', volume, 'articles', currentArticleId), currentArticle)
+    
+    setEditMode(null)
+  }
+
 
 
 
@@ -265,7 +311,7 @@ function App() {
           </Row>
         </Col>
         <Col className="p-4" md={8} style={{'backgroundColor': '#fcf1dc'}}>
-          {Object.keys(currentArticle).length > 0 && currentArticle.content && currentArticle.author && (
+          {Object.keys(currentArticle).length > 0 && (
             <Row>
 
               {/** TITLE */}
@@ -337,14 +383,15 @@ function App() {
                     </Col>
                   </Row>
               </> : addImage === 0 && <>
-                    {image && <img className="img-fluid" src={image} alt="Nobleman"/>}
+                    {imageURL && <img className="img-fluid" src={imageURL} alt="Nobleman"/>}
                     <input type="file" accept="image/*" onChange={onImageChange} />
+                    <Form.Control type="text" className="mt-2" placeholder="Enter credit" onChange={(e) => setCredit(e.target.value)} />
                     <Row className="mt-2 mb-3 justify-content-center">
                       <Col xs={2}>
-                        <Button variant="success" disabled={image === null}>Add</Button>
+                        <Button variant="success" onClick={() => insertImage(0)} disabled={imageURL === null || credit === (null || '')}>Add</Button>
                       </Col>
                       <Col xs={2}>
-                        <Button variant="primary" onClick={() => { setAddImage(null); setImage(null) }}>Cancel</Button>
+                        <Button variant="primary" onClick={() => { setAddImage(null); setImageURL(null); setImageFile(null) }}>Cancel</Button>
                       </Col>
                     </Row>
               </>}
@@ -411,14 +458,15 @@ function App() {
                             </Col>
                           </Row>
                       </> : addImage === blockIndex + 1 && <>
-                            {image && <img className="img-fluid" src={image} alt="Nobleman"/>}
+                            {imageURL && <img className="img-fluid" src={imageURL} alt="Nobleman"/>}
                             <input type="file" accept="image/*" onChange={onImageChange} />
+                            <Form.Control type="text" className="mt-2" placeholder="Enter credit" onChange={(e) => setCredit(e.target.value)} />
                             <Row className="mt-2 mb-3 justify-content-center">
                               <Col xs={2}>
-                                <Button variant="success" disabled={image === null}>Add</Button>
+                                <Button variant="success" onClick={() => insertImage(blockIndex + 1)} disabled={imageURL === null || credit === (null || '')}>Add</Button>
                               </Col>
                               <Col xs={2}>
-                                <Button variant="primary" onClick={() => { setAddImage(null); setImage(null) }}>Cancel</Button>
+                                <Button variant="primary" onClick={() => { setAddImage(null); setImageURL(null); setImageFile(null) }}>Cancel</Button>
                               </Col>
                             </Row>
                       </>}
@@ -434,10 +482,10 @@ function App() {
                         <p className="text-center mt-2 fst-italic"><b>Credit:</b> {block.data.credit}</p>
                         <Row className="mt-2 mb-3 justify-content-center">
                           <Col xs={2}>
-                            <Button variant="success">Change Photo</Button>
+                            <Button variant="success" disabled>Change Photo</Button>
                           </Col>
                           <Col xs={2}>
-                            <Button variant="danger">Delete</Button>
+                            <Button variant="danger" onClick={() => deleteImage(blockIndex)}>Delete</Button>
                           </Col>
                           <Col xs={2}>
                             <Button variant="primary" onClick={() => setEditMode(null)}>Cancel</Button>
@@ -488,14 +536,15 @@ function App() {
                               </Col>
                             </Row>
                         </> : addImage === blockIndex + 1 && <>
-                              {image && <img className="img-fluid" src={image} alt="Nobleman"/>}
+                              {imageURL && <img className="img-fluid" src={imageURL} alt="Nobleman"/>}
                               <input type="file" accept="image/*" onChange={onImageChange} />
+                              <Form.Control type="text" className="mt-2" placeholder="Enter credit" onChange={(e) => setCredit(e.target.value)} />
                               <Row className="mt-2 mb-3 justify-content-center">
                                 <Col xs={2}>
-                                  <Button variant="success" disabled={image === null}>Add</Button>
+                                  <Button variant="success" onClick={() => insertImage(blockIndex + 1)} disabled={imageURL === null || credit === (null || '')}>Add</Button>
                                 </Col>
                                 <Col xs={2}>
-                                  <Button variant="primary" onClick={() => { setAddImage(null); setImage(null) }}>Cancel</Button>
+                                  <Button variant="primary" onClick={() => { setAddImage(null); setImageURL(null); setImageFile(null) }}>Cancel</Button>
                                 </Col>
                               </Row>
                         </>}
@@ -561,14 +610,15 @@ function App() {
                               </Col>
                             </Row>
                         </> : addImage === blockIndex + 1 && <>
-                              {image && <img className="img-fluid" src={image} alt="Nobleman"/>}
+                              {imageURL && <img className="img-fluid" src={imageURL} alt="Nobleman"/>}
                               <input type="file" accept="image/*" onChange={onImageChange} />
+                              <Form.Control type="text" className="mt-2" placeholder="Enter credit" onChange={(e) => setCredit(e.target.value)} />
                               <Row className="mt-2 mb-3 justify-content-center">
                                 <Col xs={2}>
-                                  <Button variant="success" disabled={image === null}>Add</Button>
+                                  <Button variant="success" onClick={() => insertImage(blockIndex + 1)} disabled={imageURL === null || credit === (null || '')}>Add</Button>
                                 </Col>
                                 <Col xs={2}>
-                                  <Button variant="primary" onClick={() => { setAddImage(null); setImage(null) }}>Cancel</Button>
+                                  <Button variant="primary" onClick={() => { setAddImage(null); setImageURL(null); setImageFile(null) }}>Cancel</Button>
                                 </Col>
                               </Row>
                         </>}
