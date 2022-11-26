@@ -4,7 +4,9 @@ import { doc, getDoc, updateDoc, query, collection, getDocs, where } from 'fireb
 import { deleteObject, ref, uploadBytes, getDownloadURL } from 'firebase/storage'
 import { Col, Row, Container, Button, ListGroup, Form, Popover, OverlayTrigger, ButtonGroup } from 'react-bootstrap'
 import Select from 'react-select'
+import Toggle from 'react-toggle'
 import './App.css'
+import "react-toggle/style.css"
 
 function App() {
 
@@ -24,6 +26,7 @@ function App() {
   const [imageURL, setImageURL] = useState(null)
   const [imageFile, setImageFile] = useState(null)
   const [credit, setCredit] = useState(null)
+  const [isPublished, setIsPublished] = useState(null)
 
 
   const [volume, setVolume] = useState('')
@@ -56,6 +59,7 @@ function App() {
 
   async function showArticle(article) {
     const articleSnap = await getDoc(doc(db, article.id.path))
+    setIsPublished(article.published)
     setCurrentArticle(articleSnap.data())
     setCurrentArticleId(article.id.path.split('/').at(-1))
   }
@@ -272,8 +276,19 @@ function App() {
     setEditMode(null)
   }
 
+  async function handlePublishToggle(checked) {
+    // Update articles
+    setIsPublished(checked)
+    const articleIndex = articles.indexOf(articles.find(elem => elem.id.path === `volumes/${volume}/articles/${currentArticleId}`))
+    const articlesCopy = articles
+    articlesCopy[articleIndex].published = checked
+    setArticles(articlesCopy)
 
-
+    // Update edition document on db
+    await updateDoc(doc(db, 'volumes', volume, 'editions', edition), {
+      articles: articlesCopy
+    })
+  }
 
   return (
     <Container>
@@ -344,6 +359,18 @@ function App() {
                 </div>
               ) : <h4 onClick={() => setEditAuthorMode(true)} className="fw-normal mb-3">{currentArticle.author.name}</h4>}
               
+              <Row>
+                <Col sm={1}>
+                  <p>Published:</p>
+                </Col>
+                <Col sm={1} style={{'marginLeft': '20px'}}>
+                  <Toggle
+                  id='published_status'
+                  defaultChecked={isPublished}
+                  onChange={(e) => handlePublishToggle(e.target.checked)} />
+                </Col>
+              </Row>
+
               {/** FIRST ADD BLOCK */}
               <Row className="add-block justify-content-center mt-2">
                 <hr></hr>
