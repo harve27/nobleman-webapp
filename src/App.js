@@ -2,7 +2,7 @@ import { useState } from 'react'
 import { db, storage } from './firebase'
 import { doc, getDoc, updateDoc, query, collection, getDocs, where, addDoc, arrayUnion, deleteDoc } from 'firebase/firestore'
 import { deleteObject, ref, uploadBytes, getDownloadURL } from 'firebase/storage'
-import { Col, Row, Container, Button, ListGroup, Form, Popover, OverlayTrigger, ButtonGroup, Modal } from 'react-bootstrap'
+import { Col, Row, Container, Button, ListGroup, Form, Popover, ButtonGroup, Modal, Overlay } from 'react-bootstrap'
 import Select from 'react-select'
 import Toggle from 'react-toggle'
 import './App.css'
@@ -36,6 +36,8 @@ function App() {
 
   const [showCreateModal, setShowCreateModal] = useState(false)
   const [showDeleteModal, setShowDeleteModal] = useState(false)
+  const [showAddBlock, setShowAddBlock] = useState(null)
+  const [targetAddBlock, setTargetAddBlock] = useState(null)
   const [authorList, setAuthorList] = useState([])
 
   const volumes = [
@@ -387,6 +389,11 @@ function App() {
     setShowCreateModal(true)
   }
 
+  function handleAddClick(event, blockIndex) {
+    setShowAddBlock(blockIndex)
+    setTargetAddBlock(event.target)
+  }
+
   return (
     <Container>
       <Row className="justify-content-md-center">
@@ -533,19 +540,19 @@ function App() {
               <Row className="add-block justify-content-center mt-2">
                 <hr></hr>
                 <Col className="add-block-button" md={1}>
-                  <OverlayTrigger trigger="click" placement="right" overlay={
+                  <Overlay show={showAddBlock === 0} placement="right" target={targetAddBlock}>
                     <Popover id="popover-basic">
                       <Popover.Body>
                         <ButtonGroup>
-                          <Button onClick={() => { setEditMode(null); setAddParagraph(0)} }>Paragraph</Button>
-                          <Button onClick={() => { setEditMode(null); setAddImage(0)} }>Image</Button>
-                          <Button onClick={() => { setEditMode(null); setAddQuote(0)} }>Quote</Button>
+                          <Button onClick={() => { setEditMode(null); setAddParagraph(0); setShowAddBlock(null); setTargetAddBlock(null) } }>Paragraph</Button>
+                          <Button onClick={() => { setEditMode(null); setAddImage(0); setShowAddBlock(null); setTargetAddBlock(null)} }>Image</Button>
+                          <Button onClick={() => { setEditMode(null); setAddQuote(0); setShowAddBlock(null); setTargetAddBlock(null)} }>Quote</Button>
                         </ButtonGroup>
                       </Popover.Body>
-                    </Popover>}>
-                    <Button style={{'borderRadius': '50%', 'margin-top': '-60px'}} variant="info">+</Button>                          
-                  </OverlayTrigger>
-                  </Col>
+                    </Popover>
+                  </Overlay>
+                  <Button style={{'borderRadius': '50%', 'margin-top': '-60px'}} onClick={(e) => handleAddClick(e, 0)} variant="info">+</Button>                          
+                </Col>
               </Row>
               {addParagraph === 0 ? <>
                 <Form.Control as="textarea" onChange={(e) => setParagraph(e.target.value)}/>
@@ -608,19 +615,19 @@ function App() {
                       <Row className="add-block justify-content-center mt-2">
                         <hr></hr>
                         <Col className="add-block-button" md={1}>
-                          <OverlayTrigger trigger="click" placement="right" overlay={
+                          <Overlay show={showAddBlock === blockIndex + 1} placement="right" target={targetAddBlock}>
                             <Popover id="popover-basic">
                               <Popover.Body>
                                 <ButtonGroup>
-                                  <Button onClick={() => { setEditMode(null); setAddParagraph(blockIndex + 1)} }>Paragraph</Button>
-                                  <Button onClick={() => { setEditMode(null); setAddImage(blockIndex + 1)} }>Image</Button>
-                                  <Button onClick={() => { setEditMode(null); setAddQuote(blockIndex + 1)} }>Quote</Button>
+                                  <Button onClick={() => { setEditMode(null); setAddParagraph(blockIndex + 1); setShowAddBlock(null); setTargetAddBlock(null) } }>Paragraph</Button>
+                                  <Button onClick={() => { setEditMode(null); setAddImage(blockIndex + 1); setShowAddBlock(null); setTargetAddBlock(null)} }>Image</Button>
+                                  <Button onClick={() => { setEditMode(null); setAddQuote(blockIndex + 1); setShowAddBlock(null); setTargetAddBlock(null)} }>Quote</Button>
                                 </ButtonGroup>
                               </Popover.Body>
-                            </Popover>}>
-                            <Button style={{'borderRadius': '50%', 'margin-top': '-60px'}} variant="info">+</Button>                          
-                          </OverlayTrigger>
-                          </Col>
+                            </Popover>
+                          </Overlay>
+                          <Button style={{'borderRadius': '50%', 'margin-top': '-60px'}} onClick={(e) => handleAddClick(e, blockIndex + 1)} variant="info">+</Button>                          
+                        </Col>
                       </Row>
                       {addParagraph === blockIndex + 1 ? <>
                         <Form.Control as="textarea" onChange={(e) => setParagraph(e.target.value)}/>
@@ -686,19 +693,19 @@ function App() {
                         <Row className="add-block justify-content-center mt-2">
                           <hr></hr>
                           <Col className="add-block-button" md={1}>
-                            <OverlayTrigger trigger="click" placement="right" overlay={
+                            <Overlay show={showAddBlock === blockIndex + 1} placement="right" target={targetAddBlock}>
                               <Popover id="popover-basic">
                                 <Popover.Body>
                                   <ButtonGroup>
-                                    <Button onClick={() => setAddParagraph(blockIndex + 1)}>Paragraph</Button>
-                                    <Button onClick={() => setAddImage(blockIndex + 1)}>Image</Button>
-                                    <Button onClick={() => setAddQuote(blockIndex + 1)}>Quote</Button>
+                                    <Button onClick={() => { setEditMode(null); setAddParagraph(blockIndex + 1); setShowAddBlock(null); setTargetAddBlock(null) } }>Paragraph</Button>
+                                    <Button onClick={() => { setEditMode(null); setAddImage(blockIndex + 1); setShowAddBlock(null); setTargetAddBlock(null)} }>Image</Button>
+                                    <Button onClick={() => { setEditMode(null); setAddQuote(blockIndex + 1); setShowAddBlock(null); setTargetAddBlock(null)} }>Quote</Button>
                                   </ButtonGroup>
                                 </Popover.Body>
-                              </Popover>}>
-                              <Button style={{'borderRadius': '50%', 'margin-top': '-60px'}} variant="info">+</Button>                          
-                            </OverlayTrigger>
-                            </Col>
+                              </Popover>
+                            </Overlay>
+                            <Button style={{'borderRadius': '50%', 'margin-top': '-60px'}} onClick={(e) => handleAddClick(e, blockIndex + 1)} variant="info">+</Button>                          
+                          </Col>
                         </Row>
                         {addParagraph === blockIndex + 1 ? <>
                           <Form.Control as="textarea" onChange={(e) => setParagraph(e.target.value)}/>
@@ -760,19 +767,19 @@ function App() {
                         <Row className="add-block justify-content-center mt-2">
                           <hr></hr>
                           <Col className="add-block-button" md={1}>
-                            <OverlayTrigger trigger="click" placement="right" overlay={
+                            <Overlay show={showAddBlock === blockIndex + 1} placement="right" target={targetAddBlock}>
                               <Popover id="popover-basic">
                                 <Popover.Body>
                                   <ButtonGroup>
-                                    <Button onClick={() => setAddParagraph(blockIndex + 1)}>Paragraph</Button>
-                                    <Button onClick={() => setAddImage(blockIndex + 1)}>Image</Button>
-                                    <Button onClick={() => setAddQuote(blockIndex + 1)}>Quote</Button>
+                                    <Button onClick={() => { setEditMode(null); setAddParagraph(blockIndex + 1); setShowAddBlock(null); setTargetAddBlock(null) } }>Paragraph</Button>
+                                    <Button onClick={() => { setEditMode(null); setAddImage(blockIndex + 1); setShowAddBlock(null); setTargetAddBlock(null)} }>Image</Button>
+                                    <Button onClick={() => { setEditMode(null); setAddQuote(blockIndex + 1); setShowAddBlock(null); setTargetAddBlock(null)} }>Quote</Button>
                                   </ButtonGroup>
                                 </Popover.Body>
-                              </Popover>}>
-                              <Button style={{'borderRadius': '50%', 'margin-top': '-60px'}} variant="info">+</Button>                          
-                            </OverlayTrigger>
-                            </Col>
+                              </Popover>
+                            </Overlay>
+                            <Button style={{'borderRadius': '50%', 'margin-top': '-60px'}} onClick={(e) => handleAddClick(e, blockIndex + 1)} variant="info">+</Button>                          
+                          </Col>
                         </Row>
                         {addParagraph === blockIndex + 1 ? <>
                           <Form.Control as="textarea" onChange={(e) => setParagraph(e.target.value)}/>
