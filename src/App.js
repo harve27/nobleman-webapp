@@ -1,8 +1,8 @@
 import { useState } from 'react'
 import { db, storage } from './firebase'
-import { doc, getDoc, updateDoc, query, collection, getDocs, where } from 'firebase/firestore'
+import { doc, getDoc, updateDoc, query, collection, getDocs, where, addDoc, arrayUnion } from 'firebase/firestore'
 import { deleteObject, ref, uploadBytes, getDownloadURL } from 'firebase/storage'
-import { Col, Row, Container, Button, ListGroup, Form, Popover, OverlayTrigger, ButtonGroup } from 'react-bootstrap'
+import { Col, Row, Container, Button, ListGroup, Form, Popover, OverlayTrigger, ButtonGroup, Modal } from 'react-bootstrap'
 import Select from 'react-select'
 import Toggle from 'react-toggle'
 import './App.css'
@@ -28,12 +28,14 @@ function App() {
   const [credit, setCredit] = useState(null)
   const [isPublished, setIsPublished] = useState(null)
 
-
   const [volume, setVolume] = useState('')
   const [edition, setEdition] = useState('')
-  const [articles, setArticles] = useState([])
+  const [articles, setArticles] = useState(null)
   const [currentArticle, setCurrentArticle] = useState({})
   const [currentArticleId, setCurrentArticleId] = useState(0)
+
+  const [showModal, setShowModal] = useState(false)
+  const [authorList, setAuthorList] = useState([])
 
   const volumes = [
     {value: '112', label: '112'},
@@ -62,6 +64,53 @@ function App() {
     setIsPublished(article.published)
     setCurrentArticle(articleSnap.data())
     setCurrentArticleId(article.id.path.split('/').at(-1))
+  }
+
+  async function createArticle() {
+    const authorId = `volumes/${volume}/authors/${authorList.find(elem => elem.value === author).id}`
+    
+    // LOCAL: set currentArticle to newArticle
+    const newArticle = {
+      author: {
+        id: doc(db, authorId),
+        name: author
+      },
+      content: [],
+      title: title
+    }
+    setCurrentArticle(newArticle)
+
+    // DB: add new document to articles collection
+    const articleRef = await addDoc(collection(db, 'volumes', volume, 'articles'), newArticle)
+    const articleId = `volumes/${volume}/articles/${articleRef.id}`
+
+    // LOCAL: update articles state
+    const articlesCopy = articles
+    articlesCopy.push({
+      author: {
+        id: doc(db, authorId),
+        name: author
+      },
+      published: false,
+      title: title,
+      id: doc(db, articleId),
+    })
+    setArticles(articlesCopy)
+
+    // DB: update edition document
+    await updateDoc(doc(db, 'volumes', volume, 'editions', edition), {
+      articles: articlesCopy
+    })
+
+    // DB: add article to author document
+    await updateDoc(doc(db, authorId), {
+      articles: arrayUnion({
+        id: doc(db, articleId),
+        title: title,
+      })
+    })
+
+    setShowModal(false)
   }
 
   function onImageChange(e) {
@@ -95,6 +144,14 @@ function App() {
     await updateDoc(doc(db, 'volumes', volume, 'articles', currentArticleId), {
       title: title
     })
+
+    // Update author document on db
+    const querySnapshot = await getDocs(query(collection(db, 'volumes', volume, 'authors'), where('name', '==', author)))
+    const authorId = querySnapshot.docs[0].id
+    const authorDocCopy = querySnapshot.docs[0].data()
+    const articleIndex = authorDocCopy.articles.indexOf(authorDocCopy.articles.find(elem => elem.title === oldTitle))
+    authorDocCopy.articles[articleIndex].title = title
+    await updateDoc(doc(db, 'volumes', volume, 'authors', authorId), authorDocCopy)
 
     setTitle(null)
     setEditTitleMode(false)
@@ -230,7 +287,7 @@ function App() {
     setAddQuote(null)
   }
 
-  // TODO: Create editImage function (for now, delete and add)
+  // TODO: Create editImage function (for now, delete and add), have ability to edit caption
   // async function editImage(blockIndex) { }
 
   // TODO: Change security rules so that only authorized users can access it
@@ -290,6 +347,15 @@ function App() {
     })
   }
 
+  async function handleShowModal() {
+    setAuthorList([])
+    const authorSnapshot = await getDocs(query(collection(db, 'volumes', volume, 'authors')))
+    const authorListCopy = []
+    authorSnapshot.forEach((doc) => authorListCopy.push({value: doc.data().name, label: doc.data().name, id: doc.id}))
+    setAuthorList(authorListCopy)
+    setShowModal(true)
+  }
+
   return (
     <Container>
       <Row className="justify-content-md-center">
@@ -316,6 +382,48 @@ function App() {
           </Row>
           <Row className="mt-4">
             <ListGroup>
+              {articles &&  (
+                <ListGroup.Item style={{'backgroundColor': '#92e88e', 'cursor': 'pointer'}} onClick={() => handleShowModal()}>
+                  + Create new article
+                </ListGroup.Item>
+              )}
+
+              {/** Modal for initial article submission */}
+              <Modal
+                show={showModal}
+                onHide={() => setShowModal(false)}
+                backdrop="static"
+                keyboard={false}
+              >
+                <Modal.Header closeButton>
+                  <Modal.Title>Create new article</Modal.Title>
+                </Modal.Header>
+                <Modal.Body>
+                  <Form>
+                    <Form.Group className="mb-3">
+                      <Form.Label>Title</Form.Label>
+                      <Form.Control
+                        type="text"
+                        onChange={(e) => setTitle(e.target.value)}
+                        autoFocus
+                      />
+                    </Form.Group>
+                    <Form.Group
+                      className="mb-3"
+                    >
+                      <Form.Label>Author</Form.Label>
+                      <Select options={authorList} onChange={(e) => setAuthor(e.value)}/>
+                    </Form.Group>
+                  </Form>
+                </Modal.Body>
+                <Modal.Footer>
+                  <Button variant="secondary" onClick={() => setShowModal(false)}>
+                    Cancel
+                  </Button>
+                  <Button variant="primary" disabled={(title === null || title === '') || (author === null || author === '')} onClick={() => createArticle()}>Create</Button>
+                </Modal.Footer>
+              </Modal>
+
               {articles && articles.map((article) =>
                 <ListGroup.Item action onClick={() => showArticle(article)}>
                   <h5><b>{article.title}</b></h5>
