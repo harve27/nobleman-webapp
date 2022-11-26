@@ -1,6 +1,6 @@
 import { useState } from 'react'
 import { db, storage } from './firebase'
-import { doc, getDoc, updateDoc, query, collection, getDocs, where, addDoc, arrayUnion } from 'firebase/firestore'
+import { doc, getDoc, updateDoc, query, collection, getDocs, where, addDoc, arrayUnion, deleteDoc } from 'firebase/firestore'
 import { deleteObject, ref, uploadBytes, getDownloadURL } from 'firebase/storage'
 import { Col, Row, Container, Button, ListGroup, Form, Popover, OverlayTrigger, ButtonGroup, Modal } from 'react-bootstrap'
 import Select from 'react-select'
@@ -34,7 +34,8 @@ function App() {
   const [currentArticle, setCurrentArticle] = useState({})
   const [currentArticleId, setCurrentArticleId] = useState(0)
 
-  const [showModal, setShowModal] = useState(false)
+  const [showCreateModal, setShowCreateModal] = useState(false)
+  const [showDeleteModal, setShowDeleteModal] = useState(false)
   const [authorList, setAuthorList] = useState([])
 
   const volumes = [
@@ -83,6 +84,7 @@ function App() {
     // DB: add new document to articles collection
     const articleRef = await addDoc(collection(db, 'volumes', volume, 'articles'), newArticle)
     const articleId = `volumes/${volume}/articles/${articleRef.id}`
+    setCurrentArticleId(articleRef.id)
 
     // LOCAL: update articles state
     const articlesCopy = articles
@@ -110,7 +112,36 @@ function App() {
       })
     })
 
-    setShowModal(false)
+    setShowCreateModal(false)
+  }
+
+  async function deleteArticle() {
+    // LOCAL: Set current article to null
+    setCurrentArticle({})
+
+    // LOCAL: Remove from articles
+    const articlesCopy = articles
+    const articleIndex = articlesCopy.indexOf(articlesCopy.find(elem => elem.title === title))
+    articlesCopy.splice(articleIndex, 1)
+    setArticles(articles)
+
+    console.log(currentArticleId)
+
+    // DB: Delete articles document
+    await deleteDoc(doc(db, 'volumes', volume, 'articles', currentArticleId)) 
+
+    // DB: Remove from edition document
+    await updateDoc(doc(db, 'volumes', volume, 'editions', edition), {
+      articles: articlesCopy
+    })
+
+    // DB: Remove from authors document
+    const querySnapshot = await getDocs(query(collection(db, 'volumes', volume, 'authors'), where('name', '==', author)))
+    const authorId = querySnapshot.docs[0].id
+    const authorDocCopy = querySnapshot.docs[0].data()
+    const authorArticleIndex = authorDocCopy.articles.indexOf(authorDocCopy.articles.find(elem => elem.title === title))
+    authorDocCopy.articles.splice(authorArticleIndex, 1)
+    await updateDoc(doc(db, 'volumes', volume, 'authors', authorId), authorDocCopy)
   }
 
   function onImageChange(e) {
@@ -347,13 +378,13 @@ function App() {
     })
   }
 
-  async function handleShowModal() {
+  async function handleShowCreateModal() {
     setAuthorList([])
     const authorSnapshot = await getDocs(query(collection(db, 'volumes', volume, 'authors')))
     const authorListCopy = []
     authorSnapshot.forEach((doc) => authorListCopy.push({value: doc.data().name, label: doc.data().name, id: doc.id}))
     setAuthorList(authorListCopy)
-    setShowModal(true)
+    setShowCreateModal(true)
   }
 
   return (
@@ -383,15 +414,15 @@ function App() {
           <Row className="mt-4">
             <ListGroup>
               {articles &&  (
-                <ListGroup.Item style={{'backgroundColor': '#92e88e', 'cursor': 'pointer'}} onClick={() => handleShowModal()}>
+                <ListGroup.Item style={{'backgroundColor': '#92e88e', 'cursor': 'pointer'}} onClick={() => handleShowCreateModal()}>
                   + Create new article
                 </ListGroup.Item>
               )}
 
               {/** Modal for initial article submission */}
               <Modal
-                show={showModal}
-                onHide={() => setShowModal(false)}
+                show={showCreateModal}
+                onHide={() => setShowCreateModal(false)}
                 backdrop="static"
                 keyboard={false}
               >
@@ -417,7 +448,7 @@ function App() {
                   </Form>
                 </Modal.Body>
                 <Modal.Footer>
-                  <Button variant="secondary" onClick={() => setShowModal(false)}>
+                  <Button variant="secondary" onClick={() => setShowCreateModal(false)}>
                     Cancel
                   </Button>
                   <Button variant="primary" disabled={(title === null || title === '') || (author === null || author === '')} onClick={() => createArticle()}>Create</Button>
@@ -478,6 +509,25 @@ function App() {
                   onChange={(e) => handlePublishToggle(e.target.checked)} />
                 </Col>
               </Row>
+              <Col sm={1}>
+                <Button variant="danger" onClick={() => setShowDeleteModal(true)}>Delete</Button>
+              </Col>
+              <Modal
+                show={showDeleteModal}
+                onHide={() => setShowDeleteModal(false)}
+                backdrop="static"
+                keyboard={false}
+              >
+                <Modal.Header closeButton>
+                  <Modal.Title>Are you sure you want to delete this?</Modal.Title>
+                </Modal.Header>
+                <Modal.Footer className="justify-content-center">
+                  <Button variant="secondary" onClick={() => setShowDeleteModal(false)}>
+                    Cancel
+                  </Button>
+                  <Button variant="danger" onClick={() => deleteArticle()}>Delete</Button>
+                </Modal.Footer>
+              </Modal>
 
               {/** FIRST ADD BLOCK */}
               <Row className="add-block justify-content-center mt-2">
