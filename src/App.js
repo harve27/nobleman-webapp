@@ -261,11 +261,21 @@ function App() {
   }
 
   async function insertParagraph(insertIndex) {
+    // Format paragraphs (if multiple entered)
+    const separatedParagraphs = paragraph.split('\n')
+    const formattedParagraphs = []
+    separatedParagraphs.forEach(text => formattedParagraphs.push({
+      data: {
+        text: text
+      },
+      type: 'paragraph'
+    }))
+
     // Update currentArticle
     const articleCopy = currentArticle
     const contentWithNewParagraph = [
       ...currentArticle.content.slice(0, insertIndex),
-      { data: { text: paragraph }, type: 'paragraph'},
+      ...formattedParagraphs,
       ...currentArticle.content.slice(insertIndex)
     ]
     articleCopy.content = contentWithNewParagraph
@@ -555,7 +565,7 @@ function App() {
                 </Col>
               </Row>
               {addParagraph === 0 ? <>
-                <Form.Control as="textarea" onChange={(e) => setParagraph(e.target.value)}/>
+                <Form.Control as="textarea" onChange={(e) => setParagraph(e.target.value)} style={{'height': '250px'}} />
                 <Row className="mt-2 mb-3 justify-content-center">
                     <Col xs={2}>
                       <Button variant="success" onClick={() => insertParagraph(0)}>Add</Button>
@@ -597,7 +607,7 @@ function App() {
                   return <div>
                     {editMode === blockIndex ? (
                       <>
-                        <Form.Control as="textarea" style={{'height': '100px'}} onChange={(e) => setParagraph(e.target.value)} defaultValue={block.data.text} />
+                        <Form.Control as="textarea" style={{'height': '250px'}} onChange={(e) => setParagraph(e.target.value)} defaultValue={block.data.text} />
                         <Row className="mt-2 justify-content-center">
                           <Col xs={2}>
                             <Button variant="success" onClick={() => editParagraph(blockIndex)}>Submit</Button>
@@ -630,7 +640,7 @@ function App() {
                         </Col>
                       </Row>
                       {addParagraph === blockIndex + 1 ? <>
-                        <Form.Control as="textarea" onChange={(e) => setParagraph(e.target.value)}/>
+                        <Form.Control as="textarea" style={{'height': '250px'}} onChange={(e) => setParagraph(e.target.value)}/>
                         <Row className="mt-2 mb-3 justify-content-center">
                             <Col xs={2}>
                               <Button variant="success" onClick={() => insertParagraph(blockIndex + 1)}>Add</Button>
@@ -708,7 +718,7 @@ function App() {
                           </Col>
                         </Row>
                         {addParagraph === blockIndex + 1 ? <>
-                          <Form.Control as="textarea" onChange={(e) => setParagraph(e.target.value)}/>
+                          <Form.Control as="textarea" style={{'height': '250px'}} onChange={(e) => setParagraph(e.target.value)}/>
                           <Row className="mt-2 mb-3 justify-content-center">
                               <Col xs={2}>
                                 <Button variant="success" onClick={() => insertParagraph(blockIndex + 1)}>Add</Button>
@@ -782,7 +792,7 @@ function App() {
                           </Col>
                         </Row>
                         {addParagraph === blockIndex + 1 ? <>
-                          <Form.Control as="textarea" onChange={(e) => setParagraph(e.target.value)}/>
+                          <Form.Control as="textarea" style={{'height': '250px'}} onChange={(e) => setParagraph(e.target.value)}/>
                           <Row className="mt-2 mb-3 justify-content-center">
                               <Col xs={2}>
                                 <Button variant="success" onClick={() => insertParagraph(blockIndex + 1)}>Add</Button>
