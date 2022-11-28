@@ -1,7 +1,8 @@
 import { useState } from 'react'
-import { db, storage } from './firebase'
+import { db, storage, auth } from './firebase'
 import { doc, getDoc, updateDoc, query, collection, getDocs, where, addDoc, arrayUnion, deleteDoc } from 'firebase/firestore'
 import { deleteObject, ref, uploadBytes, getDownloadURL } from 'firebase/storage'
+import { signInWithEmailAndPassword } from "firebase/auth";
 import { Col, Row, Container, Button, ListGroup, Form, Popover, ButtonGroup, Modal, Overlay } from 'react-bootstrap'
 import Select from 'react-select'
 import Toggle from 'react-toggle'
@@ -9,6 +10,11 @@ import './App.css'
 import "react-toggle/style.css"
 
 function App() {
+
+  const [loggedIn, setLoggedIn] = useState(false)
+  const [email, setEmail] = useState('')
+  const [password, setPassword] = useState('')
+  const [error, setError] = useState('')
 
   const [editMode, setEditMode] = useState(null) // number corresponds to block position in content array
   const [editAuthorMode, setEditAuthorMode] = useState(false)
@@ -56,6 +62,15 @@ function App() {
     {value: '7', label: '7'},
     {value: '8', label: '8'},
   ]
+
+  async function signIn() {
+    try {
+      await signInWithEmailAndPassword(auth, email, password)
+      setLoggedIn(true)
+    } catch (error) {
+      setError(error.message)
+    }
+  }
 
   async function getArticles() {
     const articleListSnap = await getDoc(doc(db, 'volumes', volume, 'editions', edition))
@@ -404,376 +419,255 @@ function App() {
     setTargetAddBlock(event.target)
   }
 
-  return (
-    <Container>
-      <Row className="justify-content-md-center">
-        <Col className="text-center pt-3">
-          <h1>Nobleman Admin Dashboard</h1>
-          <p>Use this interface to view, edit, and publish articles on the Nobles app.</p>
-        </Col>
-      </Row>
-      <Row className="h-100">
-        <Col md={4} style={{'borderRight': '1px solid gray', 'height':'800px', 'overflow': 'scroll'}}> {/** TODO: make height of page */}
-          {/** Sort articles functionality */}
-          <Row>
-            <Col>
-              <p><b>Volumes</b></p>
-              <Select options={volumes} onChange={(e) => setVolume(e.value)} />
-            </Col>
-            <Col>
-              <p><b>Editions</b></p>
-              <Select options={editions} onChange={(e) => setEdition(e.value)} />
-            </Col>
-            <Col>
-              <Button className="mt-4" onClick={() => getArticles()}>See articles!</Button>
-            </Col>
-          </Row>
-          <Row className="mt-4">
-            <ListGroup>
-              {articles &&  (
-                <ListGroup.Item style={{'backgroundColor': '#92e88e', 'cursor': 'pointer'}} onClick={() => handleShowCreateModal()}>
-                  + Create new article
-                </ListGroup.Item>
-              )}
+  if (!loggedIn) {
+    return (
+      <>
+        <Row className="justify-content-md-center">
+          <Col className="text-center pt-3">
+            <h1>Nobleman Admin Dashboard</h1>
+            <p>Please sign in below using your Nobles email and pin to access the dashboard!</p>
+          </Col>
+        </Row>
+        <Row className="justify-content-md-center">
+          <Col md={6}>
+            <Form>
+              <Form.Group className="mb-3" controlId="formBasicEmail">
+                <Form.Label>Email address</Form.Label>
+                <Form.Control type="email" placeholder="Enter email" onChange={(e) => setEmail(e.target.value)} />
+              </Form.Group>
 
-              {/** Modal for initial article submission */}
-              <Modal
-                show={showCreateModal}
-                onHide={() => setShowCreateModal(false)}
-                backdrop="static"
-                keyboard={false}
-              >
-                <Modal.Header closeButton>
-                  <Modal.Title>Create new article</Modal.Title>
-                </Modal.Header>
-                <Modal.Body>
-                  <Form>
-                    <Form.Group className="mb-3">
-                      <Form.Label>Title</Form.Label>
-                      <Form.Control
-                        type="text"
-                        onChange={(e) => setTitle(e.target.value)}
-                        autoFocus
-                      />
-                    </Form.Group>
-                    <Form.Group
-                      className="mb-3"
-                    >
-                      <Form.Label>Author</Form.Label>
-                      <Select options={authorList} onChange={(e) => setAuthor(e.value)}/>
-                    </Form.Group>
-                  </Form>
-                </Modal.Body>
-                <Modal.Footer>
-                  <Button variant="secondary" onClick={() => setShowCreateModal(false)}>
-                    Cancel
-                  </Button>
-                  <Button variant="primary" disabled={(title === null || title === '') || (author === null || author === '')} onClick={() => createArticle()}>Create</Button>
-                </Modal.Footer>
-              </Modal>
-
-              {articles && articles.map((article) =>
-                <ListGroup.Item action onClick={() => showArticle(article)}>
-                  <h5><b>{article.title}</b></h5>
-                  <p>{article.author.name}</p>
-                </ListGroup.Item>
-              )}
-            </ListGroup>
-          </Row>
-        </Col>
-        <Col className="p-4" md={8} style={{'backgroundColor': '#fcf1dc'}}>
-          {Object.keys(currentArticle).length > 0 && (
+              <Form.Group className="mb-3" controlId="formBasicPassword">
+                <Form.Label>Password</Form.Label>
+                <Form.Control type="password" placeholder="Password" onChange={(e) => setPassword(e.target.value)} />
+              </Form.Group>
+              <Button variant="primary" type="button" onClick={() => signIn()}>
+                Submit
+              </Button>
+              {error !== "" && <p className="fw-bold" style={{'color': 'red'}}>{error}</p>}
+            </Form>
+          </Col>
+        </Row>
+      </>
+    )
+  } else {
+    return (
+      <Container>
+        <Row className="justify-content-md-center">
+          <Col className="text-center pt-3">
+            <h1>Nobleman Admin Dashboard</h1>
+            <p>Use this interface to view, edit, and publish articles on the Nobles app.</p>
+          </Col>
+        </Row>
+        <Row className="h-100">
+          <Col md={4} style={{'borderRight': '1px solid gray', 'height':'800px', 'overflow': 'scroll'}}> {/** TODO: make height of page */}
+            {/** Sort articles functionality */}
             <Row>
-
-              {/** TITLE */}
-              {editTitleMode ? (
-                <div>
-                  <Form.Control type="text" onChange={(e) => setTitle(e.target.value)} defaultValue={currentArticle.title}></Form.Control>
-                  <Row className="justify-content-start mt-2 mb-2">
-                    <Col md={1}>
-                      <Button variant="success" onClick={() => editTitle()}>Submit</Button>
-                    </Col>
-                    <Col md={1} style={{'margin-left': '20px'}}>
-                      <Button variant="primary" onClick={() => setEditTitleMode(false)}>Cancel</Button>
-                    </Col>
-                  </Row>
-                </div>
-              ) : <h2 onClick={() => setEditTitleMode(true)} className="fw-bold fst-italic">{currentArticle.title}</h2>}
-              
-              {/** AUTHOR */}
-              {editAuthorMode ? (
-                <div className="mb-3">
-                  <Form.Control type="text" onChange={(e) => setAuthor(e.target.value)} defaultValue={currentArticle.author.name}></Form.Control>
-                  <Row className="justify-content-start mt-2 mb-2">
-                    <Col md={1}>
-                      <Button variant="success" onClick={() => editAuthor()}>Submit</Button>
-                    </Col>
-                    <Col md={1} style={{'margin-left': '20px'}}>
-                      <Button variant="primary" onClick={() => setEditAuthorMode(false)}>Cancel</Button>
-                    </Col>
-                  </Row>
-                </div>
-              ) : <h4 onClick={() => setEditAuthorMode(true)} className="fw-normal mb-3">{currentArticle.author.name}</h4>}
-              
-              <Row>
-                <Col sm={1}>
-                  <p>Published:</p>
-                </Col>
-                <Col sm={1} style={{'marginLeft': '20px'}}>
-                  <Toggle
-                  id='published_status'
-                  defaultChecked={isPublished}
-                  onChange={(e) => handlePublishToggle(e.target.checked)} />
-                </Col>
-              </Row>
-              <Col sm={1}>
-                <Button variant="danger" onClick={() => setShowDeleteModal(true)}>Delete</Button>
+              <Col>
+                <p><b>Volumes</b></p>
+                <Select options={volumes} onChange={(e) => setVolume(e.value)} />
               </Col>
-              <Modal
-                show={showDeleteModal}
-                onHide={() => setShowDeleteModal(false)}
-                backdrop="static"
-                keyboard={false}
-              >
-                <Modal.Header closeButton>
-                  <Modal.Title>Are you sure you want to delete this?</Modal.Title>
-                </Modal.Header>
-                <Modal.Footer className="justify-content-center">
-                  <Button variant="secondary" onClick={() => setShowDeleteModal(false)}>
-                    Cancel
-                  </Button>
-                  <Button variant="danger" onClick={() => deleteArticle()}>Delete</Button>
-                </Modal.Footer>
-              </Modal>
+              <Col>
+                <p><b>Editions</b></p>
+                <Select options={editions} onChange={(e) => setEdition(e.value)} />
+              </Col>
+              <Col>
+                <Button className="mt-4" onClick={() => getArticles()}>See articles!</Button>
+              </Col>
+            </Row>
+            <Row className="mt-4">
+              <ListGroup>
+                {articles &&  (
+                  <ListGroup.Item style={{'backgroundColor': '#92e88e', 'cursor': 'pointer'}} onClick={() => handleShowCreateModal()}>
+                    + Create new article
+                  </ListGroup.Item>
+                )}
 
-              {/** FIRST ADD BLOCK */}
-              <Row className="add-block justify-content-center mt-2">
-                <hr></hr>
-                <Col className="add-block-button" md={1}>
-                  <Overlay show={showAddBlock === 0} placement="right" target={targetAddBlock}>
-                    <Popover id="popover-basic">
-                      <Popover.Body>
-                        <ButtonGroup>
-                          <Button onClick={() => { setEditMode(null); setAddParagraph(0); setShowAddBlock(null); setTargetAddBlock(null) } }>Paragraph</Button>
-                          <Button onClick={() => { setEditMode(null); setAddImage(0); setShowAddBlock(null); setTargetAddBlock(null)} }>Image</Button>
-                          <Button onClick={() => { setEditMode(null); setAddQuote(0); setShowAddBlock(null); setTargetAddBlock(null)} }>Quote</Button>
-                        </ButtonGroup>
-                      </Popover.Body>
-                    </Popover>
-                  </Overlay>
-                  <Button style={{'borderRadius': '50%', 'margin-top': '-60px'}} onClick={(e) => handleAddClick(e, 0)} variant="info">+</Button>                          
-                </Col>
-              </Row>
-              {addParagraph === 0 ? <>
-                <Form.Control as="textarea" onChange={(e) => setParagraph(e.target.value)} style={{'height': '250px'}} />
-                <Row className="mt-2 mb-3 justify-content-center">
-                    <Col xs={2}>
-                      <Button variant="success" onClick={() => insertParagraph(0)}>Add</Button>
-                    </Col>
-                    <Col xs={2}>
-                      <Button variant="primary" onClick={() => setAddParagraph(null)}>Cancel</Button>
-                    </Col>
-                  </Row>
-              </> : addQuote === 0 ? <>
-                <Form.Control as="textarea" onChange={(e) => setQuote(e.target.value)}/>
-                <Row className="mt-2 mb-3 justify-content-center">
-                    <Col xs={2}>
-                      <Button variant="success" onClick={() => insertQuote(0)}>Add</Button>
-                    </Col>
-                    <Col xs={2}>
-                      <Button variant="primary" onClick={() => setAddQuote(null)}>Cancel</Button>
-                    </Col>
-                  </Row>
-              </> : addImage === 0 && <>
-                    {imageURL && <img className="img-fluid" src={imageURL} alt="Nobleman"/>}
-                    <input type="file" accept="image/*" onChange={onImageChange} />
-                    <Form.Control type="text" className="mt-2" placeholder="Enter credit" onChange={(e) => setCredit(e.target.value)} />
-                    <Row className="mt-2 mb-3 justify-content-center">
-                      <Col xs={2}>
-                        <Button variant="success" onClick={() => insertImage(0)} disabled={imageURL === null || credit === (null || '')}>Add</Button>
+                {/** Modal for initial article submission */}
+                <Modal
+                  show={showCreateModal}
+                  onHide={() => setShowCreateModal(false)}
+                  backdrop="static"
+                  keyboard={false}
+                >
+                  <Modal.Header closeButton>
+                    <Modal.Title>Create new article</Modal.Title>
+                  </Modal.Header>
+                  <Modal.Body>
+                    <Form>
+                      <Form.Group className="mb-3">
+                        <Form.Label>Title</Form.Label>
+                        <Form.Control
+                          type="text"
+                          onChange={(e) => setTitle(e.target.value)}
+                          autoFocus
+                        />
+                      </Form.Group>
+                      <Form.Group
+                        className="mb-3"
+                      >
+                        <Form.Label>Author</Form.Label>
+                        <Select options={authorList} onChange={(e) => setAuthor(e.value)}/>
+                      </Form.Group>
+                    </Form>
+                  </Modal.Body>
+                  <Modal.Footer>
+                    <Button variant="secondary" onClick={() => setShowCreateModal(false)}>
+                      Cancel
+                    </Button>
+                    <Button variant="primary" disabled={(title === null || title === '') || (author === null || author === '')} onClick={() => createArticle()}>Create</Button>
+                  </Modal.Footer>
+                </Modal>
+
+                {articles && articles.map((article) =>
+                  <ListGroup.Item action onClick={() => showArticle(article)}>
+                    <h5><b>{article.title}</b></h5>
+                    <p>{article.author.name}</p>
+                  </ListGroup.Item>
+                )}
+              </ListGroup>
+            </Row>
+          </Col>
+          <Col className="p-4" md={8} style={{'backgroundColor': '#fcf1dc'}}>
+            {Object.keys(currentArticle).length > 0 && (
+              <Row>
+
+                {/** TITLE */}
+                {editTitleMode ? (
+                  <div>
+                    <Form.Control type="text" onChange={(e) => setTitle(e.target.value)} defaultValue={currentArticle.title}></Form.Control>
+                    <Row className="justify-content-start mt-2 mb-2">
+                      <Col md={1}>
+                        <Button variant="success" onClick={() => editTitle()}>Submit</Button>
                       </Col>
-                      <Col xs={2}>
-                        <Button variant="primary" onClick={() => { setAddImage(null); setImageURL(null); setImageFile(null) }}>Cancel</Button>
+                      <Col md={1} style={{'margin-left': '20px'}}>
+                        <Button variant="primary" onClick={() => setEditTitleMode(false)}>Cancel</Button>
                       </Col>
                     </Row>
-              </>}
+                  </div>
+                ) : <h2 onClick={() => setEditTitleMode(true)} className="fw-bold fst-italic">{currentArticle.title}</h2>}
+                
+                {/** AUTHOR */}
+                {editAuthorMode ? (
+                  <div className="mb-3">
+                    <Form.Control type="text" onChange={(e) => setAuthor(e.target.value)} defaultValue={currentArticle.author.name}></Form.Control>
+                    <Row className="justify-content-start mt-2 mb-2">
+                      <Col md={1}>
+                        <Button variant="success" onClick={() => editAuthor()}>Submit</Button>
+                      </Col>
+                      <Col md={1} style={{'margin-left': '20px'}}>
+                        <Button variant="primary" onClick={() => setEditAuthorMode(false)}>Cancel</Button>
+                      </Col>
+                    </Row>
+                  </div>
+                ) : <h4 onClick={() => setEditAuthorMode(true)} className="fw-normal mb-3">{currentArticle.author.name}</h4>}
+                
+                <Row>
+                  <Col sm={1}>
+                    <p>Published:</p>
+                  </Col>
+                  <Col sm={1} style={{'marginLeft': '20px'}}>
+                    <Toggle
+                    id='published_status'
+                    defaultChecked={isPublished}
+                    onChange={(e) => handlePublishToggle(e.target.checked)} />
+                  </Col>
+                </Row>
+                <Col sm={1}>
+                  <Button variant="danger" onClick={() => setShowDeleteModal(true)}>Delete</Button>
+                </Col>
+                <Modal
+                  show={showDeleteModal}
+                  onHide={() => setShowDeleteModal(false)}
+                  backdrop="static"
+                  keyboard={false}
+                >
+                  <Modal.Header closeButton>
+                    <Modal.Title>Are you sure you want to delete this?</Modal.Title>
+                  </Modal.Header>
+                  <Modal.Footer className="justify-content-center">
+                    <Button variant="secondary" onClick={() => setShowDeleteModal(false)}>
+                      Cancel
+                    </Button>
+                    <Button variant="danger" onClick={() => deleteArticle()}>Delete</Button>
+                  </Modal.Footer>
+                </Modal>
 
-              {/** CONTENT */}
-              {currentArticle.content.map((block) => {
-                const blockIndex = currentArticle.content.indexOf(block)
-
-                // PARAGRAPH
-                if (block.type === "paragraph") {
-                  return <div>
-                    {editMode === blockIndex ? (
-                      <>
-                        <Form.Control as="textarea" style={{'height': '250px'}} onChange={(e) => setParagraph(e.target.value)} defaultValue={block.data.text} />
-                        <Row className="mt-2 justify-content-center">
-                          <Col xs={2}>
-                            <Button variant="success" onClick={() => editParagraph(blockIndex)}>Submit</Button>
-                          </Col>
-                          <Col xs={2}>
-                            <Button variant="danger" onClick={() => deleteParagraph(blockIndex)}>Delete</Button>
-                          </Col>
-                          <Col xs={2}>
-                            <Button variant="primary" onClick={() => setEditMode(null)}>Cancel</Button>
-                          </Col>
-                        </Row>
-                      </>
-                    ) : <>
-                      <p onClick={() => { setAddParagraph(null); setEditMode(blockIndex) }}>{block.data.text}</p>
-                      <Row className="add-block justify-content-center mt-2">
-                        <hr></hr>
-                        <Col className="add-block-button" md={1}>
-                          <Overlay show={showAddBlock === blockIndex + 1} placement="right" target={targetAddBlock}>
-                            <Popover id="popover-basic">
-                              <Popover.Body>
-                                <ButtonGroup>
-                                  <Button onClick={() => { setEditMode(null); setAddParagraph(blockIndex + 1); setShowAddBlock(null); setTargetAddBlock(null) } }>Paragraph</Button>
-                                  <Button onClick={() => { setEditMode(null); setAddImage(blockIndex + 1); setShowAddBlock(null); setTargetAddBlock(null)} }>Image</Button>
-                                  <Button onClick={() => { setEditMode(null); setAddQuote(blockIndex + 1); setShowAddBlock(null); setTargetAddBlock(null)} }>Quote</Button>
-                                </ButtonGroup>
-                              </Popover.Body>
-                            </Popover>
-                          </Overlay>
-                          <Button style={{'borderRadius': '50%', 'margin-top': '-60px'}} onClick={(e) => handleAddClick(e, blockIndex + 1)} variant="info">+</Button>                          
+                {/** FIRST ADD BLOCK */}
+                <Row className="add-block justify-content-center mt-2">
+                  <hr></hr>
+                  <Col className="add-block-button" md={1}>
+                    <Overlay show={showAddBlock === 0} placement="right" target={targetAddBlock}>
+                      <Popover id="popover-basic">
+                        <Popover.Body>
+                          <ButtonGroup>
+                            <Button onClick={() => { setEditMode(null); setAddParagraph(0); setShowAddBlock(null); setTargetAddBlock(null) } }>Paragraph</Button>
+                            <Button onClick={() => { setEditMode(null); setAddImage(0); setShowAddBlock(null); setTargetAddBlock(null)} }>Image</Button>
+                            <Button onClick={() => { setEditMode(null); setAddQuote(0); setShowAddBlock(null); setTargetAddBlock(null)} }>Quote</Button>
+                          </ButtonGroup>
+                        </Popover.Body>
+                      </Popover>
+                    </Overlay>
+                    <Button style={{'borderRadius': '50%', 'margin-top': '-60px'}} onClick={(e) => handleAddClick(e, 0)} variant="info">+</Button>                          
+                  </Col>
+                </Row>
+                {addParagraph === 0 ? <>
+                  <Form.Control as="textarea" onChange={(e) => setParagraph(e.target.value)} style={{'height': '250px'}} />
+                  <Row className="mt-2 mb-3 justify-content-center">
+                      <Col xs={2}>
+                        <Button variant="success" onClick={() => insertParagraph(0)}>Add</Button>
+                      </Col>
+                      <Col xs={2}>
+                        <Button variant="primary" onClick={() => setAddParagraph(null)}>Cancel</Button>
+                      </Col>
+                    </Row>
+                </> : addQuote === 0 ? <>
+                  <Form.Control as="textarea" onChange={(e) => setQuote(e.target.value)}/>
+                  <Row className="mt-2 mb-3 justify-content-center">
+                      <Col xs={2}>
+                        <Button variant="success" onClick={() => insertQuote(0)}>Add</Button>
+                      </Col>
+                      <Col xs={2}>
+                        <Button variant="primary" onClick={() => setAddQuote(null)}>Cancel</Button>
+                      </Col>
+                    </Row>
+                </> : addImage === 0 && <>
+                      {imageURL && <img className="img-fluid" src={imageURL} alt="Nobleman"/>}
+                      <input type="file" accept="image/*" onChange={onImageChange} />
+                      <Form.Control type="text" className="mt-2" placeholder="Enter credit" onChange={(e) => setCredit(e.target.value)} />
+                      <Row className="mt-2 mb-3 justify-content-center">
+                        <Col xs={2}>
+                          <Button variant="success" onClick={() => insertImage(0)} disabled={imageURL === null || credit === (null || '')}>Add</Button>
+                        </Col>
+                        <Col xs={2}>
+                          <Button variant="primary" onClick={() => { setAddImage(null); setImageURL(null); setImageFile(null) }}>Cancel</Button>
                         </Col>
                       </Row>
-                      {addParagraph === blockIndex + 1 ? <>
-                        <Form.Control as="textarea" style={{'height': '250px'}} onChange={(e) => setParagraph(e.target.value)}/>
-                        <Row className="mt-2 mb-3 justify-content-center">
-                            <Col xs={2}>
-                              <Button variant="success" onClick={() => insertParagraph(blockIndex + 1)}>Add</Button>
-                            </Col>
-                            <Col xs={2}>
-                              <Button variant="primary" onClick={() => setAddParagraph(null)}>Cancel</Button>
-                            </Col>
-                          </Row>
-                      </> : addQuote === blockIndex + 1 ? <>
-                        <Form.Control as="textarea" onChange={(e) => setQuote(e.target.value)}/>
-                        <Row className="mt-2 mb-3 justify-content-center">
-                            <Col xs={2}>
-                              <Button variant="success" onClick={() => insertQuote(blockIndex + 1)}>Add</Button>
-                            </Col>
-                            <Col xs={2}>
-                              <Button variant="primary" onClick={() => setAddQuote(null)}>Cancel</Button>
-                            </Col>
-                          </Row>
-                      </> : addImage === blockIndex + 1 && <>
-                            {imageURL && <img className="img-fluid" src={imageURL} alt="Nobleman"/>}
-                            <input type="file" accept="image/*" onChange={onImageChange} />
-                            <Form.Control type="text" className="mt-2" placeholder="Enter credit" onChange={(e) => setCredit(e.target.value)} />
-                            <Row className="mt-2 mb-3 justify-content-center">
-                              <Col xs={2}>
-                                <Button variant="success" onClick={() => insertImage(blockIndex + 1)} disabled={imageURL === null || credit === (null || '')}>Add</Button>
-                              </Col>
-                              <Col xs={2}>
-                                <Button variant="primary" onClick={() => { setAddImage(null); setImageURL(null); setImageFile(null) }}>Cancel</Button>
-                              </Col>
-                            </Row>
-                      </>}
-                    </>}
-                  </div>
+                </>}
 
-                  // IMAGE
-                } else if (block.type === "image") {
-                  return <div>
-                    {editMode === blockIndex ? (
-                      <>
-                        <img className="img-fluid" style={{'opacity': '0.5'}} src={block.data.url} alt="Nobleman" />
-                        <p className="text-center mt-2 fst-italic"><b>Credit:</b> {block.data.credit}</p>
-                        <Row className="mt-2 mb-3 justify-content-center">
-                          <Col xs={2}>
-                            <Button variant="success" disabled>Change Photo</Button>
-                          </Col>
-                          <Col xs={2}>
-                            <Button variant="danger" onClick={() => deleteImage(blockIndex)}>Delete</Button>
-                          </Col>
-                          <Col xs={2}>
-                            <Button variant="primary" onClick={() => setEditMode(null)}>Cancel</Button>
-                          </Col>
-                        </Row>
-                      </>
-                    ) : (
-                      <>
-                        <div onClick={() => setEditMode(blockIndex)}>
-                          <img className="img-fluid" src={block.data.url} alt="Nobleman" />
-                          <p className="text-center mt-2 fst-italic"><b>Credit:</b> {block.data.credit}</p>
-                        </div>
-                        <Row className="add-block justify-content-center mt-2">
-                          <hr></hr>
-                          <Col className="add-block-button" md={1}>
-                            <Overlay show={showAddBlock === blockIndex + 1} placement="right" target={targetAddBlock}>
-                              <Popover id="popover-basic">
-                                <Popover.Body>
-                                  <ButtonGroup>
-                                    <Button onClick={() => { setEditMode(null); setAddParagraph(blockIndex + 1); setShowAddBlock(null); setTargetAddBlock(null) } }>Paragraph</Button>
-                                    <Button onClick={() => { setEditMode(null); setAddImage(blockIndex + 1); setShowAddBlock(null); setTargetAddBlock(null)} }>Image</Button>
-                                    <Button onClick={() => { setEditMode(null); setAddQuote(blockIndex + 1); setShowAddBlock(null); setTargetAddBlock(null)} }>Quote</Button>
-                                  </ButtonGroup>
-                                </Popover.Body>
-                              </Popover>
-                            </Overlay>
-                            <Button style={{'borderRadius': '50%', 'margin-top': '-60px'}} onClick={(e) => handleAddClick(e, blockIndex + 1)} variant="info">+</Button>                          
-                          </Col>
-                        </Row>
-                        {addParagraph === blockIndex + 1 ? <>
-                          <Form.Control as="textarea" style={{'height': '250px'}} onChange={(e) => setParagraph(e.target.value)}/>
-                          <Row className="mt-2 mb-3 justify-content-center">
-                              <Col xs={2}>
-                                <Button variant="success" onClick={() => insertParagraph(blockIndex + 1)}>Add</Button>
-                              </Col>
-                              <Col xs={2}>
-                                <Button variant="primary" onClick={() => setAddParagraph(null)}>Cancel</Button>
-                              </Col>
-                            </Row>
-                        </> : addQuote === blockIndex + 1 ? <>
-                          <Form.Control as="textarea" onChange={(e) => setQuote(e.target.value)}/>
-                          <Row className="mt-2 mb-3 justify-content-center">
-                              <Col xs={2}>
-                                <Button variant="success" onClick={() => insertQuote(blockIndex + 1)}>Add</Button>
-                              </Col>
-                              <Col xs={2}>
-                                <Button variant="primary" onClick={() => setAddQuote(null)}>Cancel</Button>
-                              </Col>
-                            </Row>
-                        </> : addImage === blockIndex + 1 && <>
-                              {imageURL && <img className="img-fluid" src={imageURL} alt="Nobleman"/>}
-                              <input type="file" accept="image/*" onChange={onImageChange} />
-                              <Form.Control type="text" className="mt-2" placeholder="Enter credit" onChange={(e) => setCredit(e.target.value)} />
-                              <Row className="mt-2 mb-3 justify-content-center">
-                                <Col xs={2}>
-                                  <Button variant="success" onClick={() => insertImage(blockIndex + 1)} disabled={imageURL === null || credit === (null || '')}>Add</Button>
-                                </Col>
-                                <Col xs={2}>
-                                  <Button variant="primary" onClick={() => { setAddImage(null); setImageURL(null); setImageFile(null) }}>Cancel</Button>
-                                </Col>
-                              </Row>
-                        </>}
-                      </>
-                    )}
-                  </div>
+                {/** CONTENT */}
+                {currentArticle.content.map((block) => {
+                  const blockIndex = currentArticle.content.indexOf(block)
 
-                  // QUOTE
-                } else if (block.type === "quote") {
-                  return <div>
-                    {editMode === blockIndex ? (
-                      <>
-                        <Form.Control as="textarea" defaultValue={block.data.text} onChange={(e) => setQuote(e.target.value)} />
-                        <Row className="mt-2 mb-3 justify-content-center">
+                  // PARAGRAPH
+                  if (block.type === "paragraph") {
+                    return <div>
+                      {editMode === blockIndex ? (
+                        <>
+                          <Form.Control as="textarea" style={{'height': '250px'}} onChange={(e) => setParagraph(e.target.value)} defaultValue={block.data.text} />
+                          <Row className="mt-2 justify-content-center">
                             <Col xs={2}>
-                              <Button variant="success" onClick={() => editQuote(blockIndex)}>Submit</Button>
+                              <Button variant="success" onClick={() => editParagraph(blockIndex)}>Submit</Button>
                             </Col>
                             <Col xs={2}>
-                              <Button variant="danger" onClick={() => deleteQuote(blockIndex)}>Delete</Button>
+                              <Button variant="danger" onClick={() => deleteParagraph(blockIndex)}>Delete</Button>
                             </Col>
                             <Col xs={2}>
                               <Button variant="primary" onClick={() => setEditMode(null)}>Cancel</Button>
                             </Col>
                           </Row>
-                      </>
-                    ) : <>
-                        <p onClick={() => setEditMode(blockIndex)} className="fs-4 fst-italic">{block.data.text}</p>
+                        </>
+                      ) : <>
+                        <p onClick={() => { setAddParagraph(null); setEditMode(blockIndex) }}>{block.data.text}</p>
                         <Row className="add-block justify-content-center mt-2">
                           <hr></hr>
                           <Col className="add-block-button" md={1}>
@@ -825,15 +719,168 @@ function App() {
                               </Row>
                         </>}
                       </>}
-                  </div>
-                }
-              })}
-            </Row>
-          )}
-        </Col>
-      </Row>
-    </Container>
-  );
+                    </div>
+
+                    // IMAGE
+                  } else if (block.type === "image") {
+                    return <div>
+                      {editMode === blockIndex ? (
+                        <>
+                          <img className="img-fluid" style={{'opacity': '0.5'}} src={block.data.url} alt="Nobleman" />
+                          <p className="text-center mt-2 fst-italic"><b>Credit:</b> {block.data.credit}</p>
+                          <Row className="mt-2 mb-3 justify-content-center">
+                            <Col xs={2}>
+                              <Button variant="success" disabled>Change Photo</Button>
+                            </Col>
+                            <Col xs={2}>
+                              <Button variant="danger" onClick={() => deleteImage(blockIndex)}>Delete</Button>
+                            </Col>
+                            <Col xs={2}>
+                              <Button variant="primary" onClick={() => setEditMode(null)}>Cancel</Button>
+                            </Col>
+                          </Row>
+                        </>
+                      ) : (
+                        <>
+                          <div onClick={() => setEditMode(blockIndex)}>
+                            <img className="img-fluid" src={block.data.url} alt="Nobleman" />
+                            <p className="text-center mt-2 fst-italic"><b>Credit:</b> {block.data.credit}</p>
+                          </div>
+                          <Row className="add-block justify-content-center mt-2">
+                            <hr></hr>
+                            <Col className="add-block-button" md={1}>
+                              <Overlay show={showAddBlock === blockIndex + 1} placement="right" target={targetAddBlock}>
+                                <Popover id="popover-basic">
+                                  <Popover.Body>
+                                    <ButtonGroup>
+                                      <Button onClick={() => { setEditMode(null); setAddParagraph(blockIndex + 1); setShowAddBlock(null); setTargetAddBlock(null) } }>Paragraph</Button>
+                                      <Button onClick={() => { setEditMode(null); setAddImage(blockIndex + 1); setShowAddBlock(null); setTargetAddBlock(null)} }>Image</Button>
+                                      <Button onClick={() => { setEditMode(null); setAddQuote(blockIndex + 1); setShowAddBlock(null); setTargetAddBlock(null)} }>Quote</Button>
+                                    </ButtonGroup>
+                                  </Popover.Body>
+                                </Popover>
+                              </Overlay>
+                              <Button style={{'borderRadius': '50%', 'margin-top': '-60px'}} onClick={(e) => handleAddClick(e, blockIndex + 1)} variant="info">+</Button>                          
+                            </Col>
+                          </Row>
+                          {addParagraph === blockIndex + 1 ? <>
+                            <Form.Control as="textarea" style={{'height': '250px'}} onChange={(e) => setParagraph(e.target.value)}/>
+                            <Row className="mt-2 mb-3 justify-content-center">
+                                <Col xs={2}>
+                                  <Button variant="success" onClick={() => insertParagraph(blockIndex + 1)}>Add</Button>
+                                </Col>
+                                <Col xs={2}>
+                                  <Button variant="primary" onClick={() => setAddParagraph(null)}>Cancel</Button>
+                                </Col>
+                              </Row>
+                          </> : addQuote === blockIndex + 1 ? <>
+                            <Form.Control as="textarea" onChange={(e) => setQuote(e.target.value)}/>
+                            <Row className="mt-2 mb-3 justify-content-center">
+                                <Col xs={2}>
+                                  <Button variant="success" onClick={() => insertQuote(blockIndex + 1)}>Add</Button>
+                                </Col>
+                                <Col xs={2}>
+                                  <Button variant="primary" onClick={() => setAddQuote(null)}>Cancel</Button>
+                                </Col>
+                              </Row>
+                          </> : addImage === blockIndex + 1 && <>
+                                {imageURL && <img className="img-fluid" src={imageURL} alt="Nobleman"/>}
+                                <input type="file" accept="image/*" onChange={onImageChange} />
+                                <Form.Control type="text" className="mt-2" placeholder="Enter credit" onChange={(e) => setCredit(e.target.value)} />
+                                <Row className="mt-2 mb-3 justify-content-center">
+                                  <Col xs={2}>
+                                    <Button variant="success" onClick={() => insertImage(blockIndex + 1)} disabled={imageURL === null || credit === (null || '')}>Add</Button>
+                                  </Col>
+                                  <Col xs={2}>
+                                    <Button variant="primary" onClick={() => { setAddImage(null); setImageURL(null); setImageFile(null) }}>Cancel</Button>
+                                  </Col>
+                                </Row>
+                          </>}
+                        </>
+                      )}
+                    </div>
+
+                    // QUOTE
+                  } else if (block.type === "quote") {
+                    return <div>
+                      {editMode === blockIndex ? (
+                        <>
+                          <Form.Control as="textarea" defaultValue={block.data.text} onChange={(e) => setQuote(e.target.value)} />
+                          <Row className="mt-2 mb-3 justify-content-center">
+                              <Col xs={2}>
+                                <Button variant="success" onClick={() => editQuote(blockIndex)}>Submit</Button>
+                              </Col>
+                              <Col xs={2}>
+                                <Button variant="danger" onClick={() => deleteQuote(blockIndex)}>Delete</Button>
+                              </Col>
+                              <Col xs={2}>
+                                <Button variant="primary" onClick={() => setEditMode(null)}>Cancel</Button>
+                              </Col>
+                            </Row>
+                        </>
+                      ) : <>
+                          <p onClick={() => setEditMode(blockIndex)} className="fs-4 fst-italic">{block.data.text}</p>
+                          <Row className="add-block justify-content-center mt-2">
+                            <hr></hr>
+                            <Col className="add-block-button" md={1}>
+                              <Overlay show={showAddBlock === blockIndex + 1} placement="right" target={targetAddBlock}>
+                                <Popover id="popover-basic">
+                                  <Popover.Body>
+                                    <ButtonGroup>
+                                      <Button onClick={() => { setEditMode(null); setAddParagraph(blockIndex + 1); setShowAddBlock(null); setTargetAddBlock(null) } }>Paragraph</Button>
+                                      <Button onClick={() => { setEditMode(null); setAddImage(blockIndex + 1); setShowAddBlock(null); setTargetAddBlock(null)} }>Image</Button>
+                                      <Button onClick={() => { setEditMode(null); setAddQuote(blockIndex + 1); setShowAddBlock(null); setTargetAddBlock(null)} }>Quote</Button>
+                                    </ButtonGroup>
+                                  </Popover.Body>
+                                </Popover>
+                              </Overlay>
+                              <Button style={{'borderRadius': '50%', 'margin-top': '-60px'}} onClick={(e) => handleAddClick(e, blockIndex + 1)} variant="info">+</Button>                          
+                            </Col>
+                          </Row>
+                          {addParagraph === blockIndex + 1 ? <>
+                            <Form.Control as="textarea" style={{'height': '250px'}} onChange={(e) => setParagraph(e.target.value)}/>
+                            <Row className="mt-2 mb-3 justify-content-center">
+                                <Col xs={2}>
+                                  <Button variant="success" onClick={() => insertParagraph(blockIndex + 1)}>Add</Button>
+                                </Col>
+                                <Col xs={2}>
+                                  <Button variant="primary" onClick={() => setAddParagraph(null)}>Cancel</Button>
+                                </Col>
+                              </Row>
+                          </> : addQuote === blockIndex + 1 ? <>
+                            <Form.Control as="textarea" onChange={(e) => setQuote(e.target.value)}/>
+                            <Row className="mt-2 mb-3 justify-content-center">
+                                <Col xs={2}>
+                                  <Button variant="success" onClick={() => insertQuote(blockIndex + 1)}>Add</Button>
+                                </Col>
+                                <Col xs={2}>
+                                  <Button variant="primary" onClick={() => setAddQuote(null)}>Cancel</Button>
+                                </Col>
+                              </Row>
+                          </> : addImage === blockIndex + 1 && <>
+                                {imageURL && <img className="img-fluid" src={imageURL} alt="Nobleman"/>}
+                                <input type="file" accept="image/*" onChange={onImageChange} />
+                                <Form.Control type="text" className="mt-2" placeholder="Enter credit" onChange={(e) => setCredit(e.target.value)} />
+                                <Row className="mt-2 mb-3 justify-content-center">
+                                  <Col xs={2}>
+                                    <Button variant="success" onClick={() => insertImage(blockIndex + 1)} disabled={imageURL === null || credit === (null || '')}>Add</Button>
+                                  </Col>
+                                  <Col xs={2}>
+                                    <Button variant="primary" onClick={() => { setAddImage(null); setImageURL(null); setImageFile(null) }}>Cancel</Button>
+                                  </Col>
+                                </Row>
+                          </>}
+                        </>}
+                    </div>
+                  }
+                })}
+              </Row>
+            )}
+          </Col>
+        </Row>
+      </Container>
+    )
+  }
 }
 
 export default App;
