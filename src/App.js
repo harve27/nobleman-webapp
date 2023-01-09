@@ -393,6 +393,52 @@ function App() {
     setEditMode(null)
   }
 
+  async function setPreviewImage(imageUrl) {
+    // LOCAL: Update current article
+    const articleCopy = currentArticle
+    articleCopy.previewImageUrl = imageUrl
+    setCurrentArticle(articleCopy)
+
+    // LOCAL: Update articles
+    const articleIndex = articles.indexOf(articles.find(elem => elem.id.path === `volumes/${volume}/articles/${currentArticleId}`))
+    const articlesCopy = articles
+    articlesCopy[articleIndex].previewImageUrl = imageUrl
+    setArticles(articlesCopy)
+
+    // DB: Update article document
+    await updateDoc(doc(db, 'volumes', volume, 'articles', currentArticleId), currentArticle)
+
+    // DB: Update editions document
+    await updateDoc(doc(db, 'volumes', volume, 'editions', edition), {
+      articles: articlesCopy
+    })
+
+    setEditMode(null)
+  }
+
+  async function removePreviewImage() {
+      // LOCAL: Update current article
+      const articleCopy = currentArticle
+      articleCopy.previewImageUrl = ''
+      setCurrentArticle(articleCopy)
+  
+      // LOCAL: Update articles
+      const articleIndex = articles.indexOf(articles.find(elem => elem.id.path === `volumes/${volume}/articles/${currentArticleId}`))
+      const articlesCopy = articles
+      articlesCopy[articleIndex].previewImageUrl = ''
+      setArticles(articlesCopy)
+  
+      // DB: Update article document
+      await updateDoc(doc(db, 'volumes', volume, 'articles', currentArticleId), currentArticle)
+  
+      // DB: Update editions document
+      await updateDoc(doc(db, 'volumes', volume, 'editions', edition), {
+        articles: articlesCopy
+      })
+
+      setEditMode(null)
+  }
+
   async function handlePublishToggle(checked) {
     // Update articles
     setIsPublished(checked)
@@ -734,11 +780,24 @@ function App() {
                       {editMode === blockIndex ? (
                         <>
                           <img className="img-fluid" style={{'opacity': '0.5'}} src={block.data.url} alt="Nobleman" />
-                          <p className="text-center mt-2 fst-italic"><b>Credit:</b> {block.data.credit}</p>
+                          <p className="text-center mt-2 fst-italic"><b>Credit:</b> {block.data.credit} 
+                            <span className="fw-bold" style={{'color': 'red'}}>
+                              {currentArticle.previewImageUrl === block.data.url && ' [PREVIEW IMAGE]'}
+                            </span>
+                          </p>
                           <Row className="mt-2 mb-3 justify-content-center">
                             <Col xs={2}>
                               <Button variant="success" disabled>Change Photo</Button>
                             </Col>
+                            {currentArticle.previewImageUrl === block.data.url ? (
+                              <Col xs={2}>
+                                <Button variant="warning" onClick={() => removePreviewImage(block.data.url)}>Remove as Preview</Button>
+                              </Col>
+                            ) : (
+                              <Col xs={2}>
+                                <Button variant="warning" onClick={() => setPreviewImage(block.data.url)}>Set as Preview</Button>
+                              </Col>
+                            )}
                             <Col xs={2}>
                               <Button variant="danger" onClick={() => deleteImage(blockIndex)}>Delete</Button>
                             </Col>
@@ -751,7 +810,10 @@ function App() {
                         <>
                           <div onClick={() => setEditMode(blockIndex)}>
                             <img className="img-fluid" src={block.data.url} alt="Nobleman" />
-                            <p className="text-center mt-2 fst-italic"><b>Credit:</b> {block.data.credit}</p>
+                            <p className="text-center mt-2 fst-italic"><b>Credit:</b> {block.data.credit}
+                            <span className="fw-bold" style={{'color': 'red'}}>
+                              {currentArticle.previewImageUrl === block.data.url && ' [PREVIEW IMAGE]'}
+                            </span></p>
                           </div>
                           <Row className="add-block justify-content-center mt-2">
                             <hr></hr>
