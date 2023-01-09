@@ -364,7 +364,7 @@ function App() {
     const articleCopy = currentArticle
     const contentWithNewQuote = [
       ...currentArticle.content.slice(0, insertIndex),
-      { data: { url: url, credit: credit }, type: 'image', name: imageFile.name},
+      { data: { url: url, credit: credit }, type: 'image'},
       ...currentArticle.content.slice(insertIndex)
     ]
     articleCopy.content = contentWithNewQuote
