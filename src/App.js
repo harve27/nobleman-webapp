@@ -4,6 +4,7 @@ import { doc, getDoc, updateDoc, query, collection, getDocs, where, addDoc, arra
 import { deleteObject, ref, uploadBytes, getDownloadURL } from 'firebase/storage'
 import { signInWithEmailAndPassword } from "firebase/auth";
 import { Col, Row, Container, Button, ListGroup, Form, Popover, ButtonGroup, Modal, Overlay } from 'react-bootstrap'
+import { v4 as uuidv4 } from 'uuid';
 import Select from 'react-select'
 import Toggle from 'react-toggle'
 import './App.css'
@@ -353,7 +354,8 @@ function App() {
 
   // TODO: Change security rules so that only authorized users can access it
   async function insertImage(insertIndex) {
-    const imageRef = ref(storage, `noblemen/${volume}/${edition}/${currentArticleId}/${imageFile.name}`)
+    const imageName = uuidv4() // Random image name (uuid)
+    const imageRef = ref(storage, `noblemen/${volume}/${edition}/${currentArticleId}/${imageName}`)
     
     // Upload image to Firebase Storage
     await uploadBytes(imageRef, imageFile)
@@ -379,10 +381,14 @@ function App() {
   }
 
   async function deleteImage(blockIndex) {
-    // Delete on storage
-    const imageRef = ref(storage, `noblemen/${volume}/${edition}/${currentArticleId}/${currentArticle.content[blockIndex].name}`)
-    await deleteObject(imageRef)
-    
+    // Delete on storage (try/catch in case image doesn't exist)
+    try {
+      const imageRef = ref(storage, `noblemen/${volume}/${edition}/${currentArticleId}/${currentArticle.content[blockIndex].name}`)
+      await deleteObject(imageRef)
+    } catch (err) {
+      console.log(err)
+    }
+
     // Update currentArticle
     const articleCopy = currentArticle
     articleCopy.content.splice(blockIndex, 1)
