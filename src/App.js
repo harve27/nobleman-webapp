@@ -96,6 +96,7 @@ function App() {
       content: [],
       title: title,
       published: false,
+      views: 0,
       datePublished: new Date()
     }
     setCurrentArticle(newArticle)
