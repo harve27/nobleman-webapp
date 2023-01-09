@@ -95,6 +95,7 @@ function App() {
       },
       content: [],
       title: title,
+      published: false,
       datePublished: new Date()
     }
     setCurrentArticle(newArticle)
@@ -399,6 +400,11 @@ function App() {
     const articlesCopy = articles
     articlesCopy[articleIndex].published = checked
     setArticles(articlesCopy)
+
+    // Update article document on db
+    await updateDoc(doc(db, 'volumes', volume, 'articles', currentArticleId), {
+      published: checked
+    })
 
     // Update edition document on db
     await updateDoc(doc(db, 'volumes', volume, 'editions', edition), {
