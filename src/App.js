@@ -94,7 +94,8 @@ function App() {
         name: author
       },
       content: [],
-      title: title
+      title: title,
+      datePublished: new Date()
     }
     setCurrentArticle(newArticle)
 
