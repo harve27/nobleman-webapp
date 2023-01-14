@@ -35,6 +35,9 @@ function App() {
   const [credit, setCredit] = useState(null)
   const [isPublished, setIsPublished] = useState(null)
 
+  const [volumeList, setVolumeList] = useState(null)
+  const [editionList, setEditionList] = useState(null)
+
   const [volume, setVolume] = useState('')
   const [edition, setEdition] = useState('')
   const [articles, setArticles] = useState(null)
@@ -47,35 +50,37 @@ function App() {
   const [targetAddBlock, setTargetAddBlock] = useState(null)
   const [authorList, setAuthorList] = useState([])
 
-  const volumes = [
-    {value: '112', label: '112'},
-    {value: '111', label: '111'},
-    {value: '110', label: '110'},
-  ]
-
-  const editions = [
-    {value: '1', label: '1'},
-    {value: '2', label: '2'},
-    {value: '3', label: '3'},
-    {value: '4', label: '4'},
-    {value: '5', label: '5'},
-    {value: '6', label: '6'},
-    {value: '7', label: '7'},
-    {value: '8', label: '8'},
-  ]
-
   async function signIn() {
     try {
       await signInWithEmailAndPassword(auth, email, password)
+      await getVolumes()
       setLoggedIn(true)
     } catch (error) {
       setError(error.message)
     }
   }
 
+  async function getVolumes() {
+    const volumeSnapshot = await getDocs(query(collection(db, 'volumes')))
+    const volumeListCopy = []
+    volumeSnapshot.forEach((doc) => volumeListCopy.push({value: doc.id, label: doc.id, id: doc.id}))
+    setVolumeList(volumeListCopy)
+  }
+
+  async function getEditions(volumeNum) {
+    const editionSnapshot = await getDocs(query(collection(db, 'volumes', volumeNum, 'editions')))
+    const editionListCopy = []
+    editionSnapshot.forEach((doc) => editionListCopy.push({value: doc.id, label: doc.id, id: doc.id}))
+    setEditionList(editionListCopy)
+  }
+
   async function getArticles() {
-    const articleListSnap = await getDoc(doc(db, 'volumes', volume, 'editions', edition))
-    setArticles(articleListSnap.data().articles)
+    if (volume !== '' && edition !== '') {
+      const articleListSnap = await getDoc(doc(db, 'volumes', volume, 'editions', edition))
+      setArticles(articleListSnap.data().articles)
+    } else {
+      console.log("Error! Invalid volume or edition number.")
+    }
   }
 
   async function showArticle(article) {
@@ -524,11 +529,11 @@ function App() {
             <Row>
               <Col>
                 <p><b>Volumes</b></p>
-                <Select options={volumes} onChange={(e) => setVolume(e.value)} />
+                <Select options={volumeList} onChange={async(e) => { setEdition(''); await getEditions(e.value); setVolume(e.value)}} />
               </Col>
               <Col>
                 <p><b>Editions</b></p>
-                <Select options={editions} onChange={(e) => setEdition(e.value)} />
+                <Select options={editionList} disabled={volume === ''} onChange={(e) => setEdition(e.value)} />
               </Col>
               <Col>
                 <Button className="mt-4" onClick={() => getArticles()}>See articles!</Button>
