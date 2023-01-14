@@ -53,8 +53,17 @@ function App() {
   async function signIn() {
     try {
       await signInWithEmailAndPassword(auth, email, password)
-      await getVolumes()
-      setLoggedIn(true)
+
+      // Check if user is member of web staff
+      const webStaffSnapshot = await getDocs(query(collection(db, 'web_staff')))
+      const webStaffCopy = []
+      webStaffSnapshot.forEach((doc) => webStaffCopy.push(doc.data().email))
+      if (webStaffCopy.includes(email)) {
+        await getVolumes()
+        setLoggedIn(true)
+      } else {
+        console.log("Error! User is not a member of web staff")
+      }
     } catch (error) {
       setError(error.message)
     }
