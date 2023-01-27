@@ -300,12 +300,17 @@ function App() {
     let separatedParagraphs = paragraph.split('\n')
     separatedParagraphs = separatedParagraphs.filter(paragraph => paragraph !== "")
     const formattedParagraphs = []
-    separatedParagraphs.forEach(text => formattedParagraphs.push({
-      data: {
-        text: text
-      },
-      type: 'paragraph'
-    }))
+    separatedParagraphs.forEach(text => {
+      let formattedText
+      if (text.startsWith("\t")) formattedText = text.slice(1)
+      else formattedText = text
+      formattedParagraphs.push({
+        data: {
+          text: formattedText
+        },
+        type: 'paragraph'
+      })
+    })
 
     // Update currentArticle
     const articleCopy = currentArticle
