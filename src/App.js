@@ -122,7 +122,9 @@ function App() {
     setCurrentArticleId(articleRef.id)
 
     // LOCAL: update articles state
-    const articlesCopy = articles
+    let articlesCopy
+    if (articles === undefined || articles === null) articlesCopy = []
+    else articlesCopy = articles
     articlesCopy.push({
       author: {
         id: doc(db, authorId),
@@ -551,11 +553,9 @@ function App() {
             </Row>
             <Row className="mt-4">
               <ListGroup>
-                {articles &&  (
-                  <ListGroup.Item style={{'backgroundColor': '#92e88e', 'cursor': 'pointer'}} onClick={() => handleShowCreateModal()}>
-                    + Create new article
-                  </ListGroup.Item>
-                )}
+                <ListGroup.Item style={{'backgroundColor': '#92e88e', 'cursor': 'pointer'}} onClick={() => handleShowCreateModal()}>
+                  + Create new article
+                </ListGroup.Item>
 
                 {/** Modal for initial article submission */}
                 <Modal
