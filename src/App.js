@@ -469,6 +469,9 @@ function App() {
   }
 
   async function handlePublishToggle(checked) {
+    // On create article
+    if (isPublished === null) setIsPublished(false)
+
     // Update articles
     setIsPublished(checked)
     const articleIndex = articles.indexOf(articles.find(elem => elem.id.path === `volumes/${volume}/articles/${currentArticleId}`))
