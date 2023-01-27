@@ -295,7 +295,8 @@ function App() {
 
   async function insertParagraph(insertIndex) {
     // Format paragraphs (if multiple entered)
-    const separatedParagraphs = paragraph.split('\n')
+    let separatedParagraphs = paragraph.split('\n')
+    separatedParagraphs = separatedParagraphs.filter(paragraph => paragraph !== "")
     const formattedParagraphs = []
     separatedParagraphs.forEach(text => formattedParagraphs.push({
       data: {
