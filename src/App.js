@@ -1,5 +1,7 @@
 import { useState } from 'react'
-import { db, storage, auth } from './firebase'
+import { db, storage, auth, messaging, functions } from './firebase'
+import { getToken } from "firebase/messaging";
+import { httpsCallable } from "firebase/functions";
 import { doc, getDoc, updateDoc, query, collection, getDocs, where, addDoc, arrayUnion, deleteDoc } from 'firebase/firestore'
 import { deleteObject, ref, uploadBytes, getDownloadURL } from 'firebase/storage'
 import { signInWithEmailAndPassword } from "firebase/auth";
@@ -49,6 +51,10 @@ function App() {
   const [showAddBlock, setShowAddBlock] = useState(null)
   const [targetAddBlock, setTargetAddBlock] = useState(null)
   const [authorList, setAuthorList] = useState([])
+
+  const [showPublishModal, setShowPublishModal] = useState(false)
+  const [notifyChecked, setNotifyChecked] = useState(false)
+  const [subHeadline, setSubHeadline] = useState(null)
 
   async function signIn() {
     try {
@@ -490,6 +496,67 @@ function App() {
     })
   }
 
+  async function publishArticle() {
+    // LOCAL: Update articles
+    const articleIndex = articles.indexOf(articles.find(elem => elem.id.path === `volumes/${volume}/articles/${currentArticleId}`))
+    const articlesCopy = articles
+    articlesCopy[articleIndex].published = true
+    setArticles(articlesCopy)
+
+    // LOCAL: update currentArticle
+    const currentArticleCopy = currentArticle
+    currentArticleCopy.published = true
+    setCurrentArticle(currentArticleCopy)
+
+    // DB: Update article document
+    await updateDoc(doc(db, 'volumes', volume, 'articles', currentArticleId), {
+      published: true
+    })
+
+    // DB: Update edition document
+    await updateDoc(doc(db, 'volumes', volume, 'editions', edition), {
+      articles: articlesCopy
+    })
+
+    // If notification online, then trigger cloud function
+    if (notifyChecked) {
+      const topic = 'nobleman'
+
+      const message = {
+        notification: {
+          title: currentArticle.title,
+          body: subHeadline,
+          image: currentArticle.previewImageUrl,
+        },
+        topic: topic
+      };
+  
+      getToken(messaging, { vapidKey: process.env.FIREBASE_VAPID_KEY}).then((currentToken) => {
+        if (currentToken) {
+          console.log(currentToken)
+          const notifyArticle = httpsCallable(functions, 'notifyArticle')
+          notifyArticle({message, topic, registrationToken: currentToken})
+            .then((result) => {
+              console.log(result)
+
+              // When successful this should trigger some message on the modal saying it was successful
+            })
+            .catch((err) => {
+              console.log('An error occurred while triggering cloud function. ', err);
+            });
+        } else {
+          // Show permission request UI
+          console.log('No registration token available. Request permission to generate one.');
+        }
+      }).catch((err) => {
+        console.log('An error occurred while retrieving token. ', err);
+      });
+    }
+
+    // After finished
+    setIsPublished(true)
+  }
+
   async function handleShowCreateModal() {
     setAuthorList([])
     const authorSnapshot = await getDocs(query(collection(db, 'volumes', volume, 'authors')))
@@ -644,7 +711,7 @@ function App() {
                   </div>
                 ) : <h4 onClick={() => setEditAuthorMode(true)} className="fw-normal mb-3">{currentArticle.author.name}</h4>}
                 
-                <Row>
+                {/* <Row>
                   <Col sm={1}>
                     <p>Published:</p>
                   </Col>
@@ -654,10 +721,68 @@ function App() {
                     defaultChecked={isPublished}
                     onChange={(e) => handlePublishToggle(e.target.checked)} />
                   </Col>
+                </Row> */}
+                
+                <Row>
+                  <Col sm={1}>
+                    <Button variant="danger" onClick={() => setShowDeleteModal(true)}>Delete</Button>
+                  </Col>
+                  {isPublished ? 
+                    <Col sm={1} style={{'margin-left': '15px', 'margin-top': '8px'}}>
+                    <h5 className="fw-bold" style={{'color': '#61d461'}}>Published! </h5>
+                  </Col> :
+                  <Col sm={1} style={{'margin-left': '15px'}}>
+                    <Button onClick={() => setShowPublishModal(true)}>Publish</Button>
+                  </Col> 
+                  }
                 </Row>
-                <Col sm={1}>
-                  <Button variant="danger" onClick={() => setShowDeleteModal(true)}>Delete</Button>
-                </Col>
+
+                <Modal
+                  show={showPublishModal}
+                  onHide={() => setShowPublishModal(false)}
+                  backdrop="static"
+                  keyboard={false}
+                >
+                  <Modal.Header closeButton>
+                    <Modal.Title>Publish article</Modal.Title>
+                  </Modal.Header>
+                  <Modal.Body>
+                    <Form.Check type="checkbox" label="Send notification for article?" style={{'fontSize': '120%'}} onChange={(e) => setNotifyChecked(e.target.checked)} />
+                    <br />
+                    {notifyChecked && (
+                      <div style={{'fontSize': '120%'}}>
+                        <Form.Group className="mb-3">
+                          <Form.Label>Title</Form.Label>
+                          <Form.Control
+                            type="text"
+                            placeholder={currentArticle.title}
+                            aria-label={currentArticle.title}
+                            disabled
+                            readOnly
+                          />
+                        </Form.Group>
+                        <Form.Group className="mb-3">
+                          <Form.Label>Sub-headline (optional)</Form.Label>
+                          <Form.Control type="text" placeholder="Add a descriptive body here" onChange={(e) => setSubHeadline(e.target.value)} />
+                        </Form.Group>
+                        <Form.Group className="mb-3">
+                          <Form.Label>Preview Image</Form.Label>
+                          <img src={currentArticle.previewImageUrl} alt="Preview" className="img-fluid" />
+                        </Form.Group>
+                        {isPublished && 
+                          <p className="fw-bold fst-italic text-center" style={{'color': '#90EE90'}}>Article has been published!</p>
+                        }
+                      </div>
+                    )}
+                  </Modal.Body>
+                  <Modal.Footer className="justify-content-center">
+                    <Button variant="secondary" onClick={() => { setNotifyChecked(false); setSubHeadline(null); setShowPublishModal(false)}}>
+                      Cancel
+                    </Button>
+                    <Button variant="primary" onClick={() => publishArticle()}>Publish</Button>
+                  </Modal.Footer>
+                </Modal>
+
                 <Modal
                   show={showDeleteModal}
                   onHide={() => setShowDeleteModal(false)}
