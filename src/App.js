@@ -59,6 +59,9 @@ function App() {
   const [notifyChecked, setNotifyChecked] = useState(false)
   const [subHeadline, setSubHeadline] = useState(null)
 
+  const [showMoveEditionModal, setShowMoveEditionModal] = useState(null)
+  const [isEditionMoved, setIsEditionMoved] = useState(null)
+
   const [showPublishEditionModal, setShowPublishEditionModal] = useState(false)
   const [notificationTitle, setNotificationTitle] = useState(null)
   const [notificationSubtitle, setNotificationSubtitle] = useState(null)
@@ -101,6 +104,9 @@ function App() {
     if (volume !== '' && edition !== '') {
       const articleListSnap = await getDoc(doc(db, 'volumes', volume, 'editions', edition))
       setIsEditionPublished(articleListSnap.data().published)
+      setArticles(articleListSnap.data().articles)
+    } else if (volume !== '') {
+      const articleListSnap = await getDoc(doc(db, 'volumes', volume))
       setArticles(articleListSnap.data().articles)
     } else {
       console.log("Error! Invalid volume or edition number.")
@@ -171,10 +177,16 @@ function App() {
     })
     setArticles(articlesCopy)
 
-    // DB: update edition document
-    await updateDoc(doc(db, 'volumes', volume, 'editions', edition), {
-      articles: articlesCopy
-    })
+    // DB: update edition or volume document
+    if (edition !== '') {
+      await updateDoc(doc(db, 'volumes', volume, 'editions', edition), {
+        articles: articlesCopy
+      })
+    } else {
+      await updateDoc(doc(db, 'volumes', volume), {
+        articles: articlesCopy
+      })
+    }
 
     // DB: add article to author document
     await updateDoc(doc(db, authorId), {
@@ -542,10 +554,16 @@ function App() {
       published: true
     })
 
-    // DB: Update edition document
-    await updateDoc(doc(db, 'volumes', volume, 'editions', edition), {
-      articles: articlesCopy
-    })
+    // DB: Update edition or volume document
+    if (edition !== '') {
+      await updateDoc(doc(db, 'volumes', volume, 'editions', edition), {
+        articles: articlesCopy
+      })
+    } else {
+      await updateDoc(doc(db, 'volumes', volume), {
+        articles: articlesCopy
+      })
+    }
 
     // If notification online, then trigger cloud function
     if (notifyChecked) {
@@ -584,6 +602,33 @@ function App() {
 
     // After finished
     setIsPublished(true)
+  } 
+
+  async function moveToEdition() {
+    // LOCAL: Remove article from volumes
+    const articleInfo = articles.find(elem => elem.title === currentArticle.title)
+    const articleIndex = articles.indexOf(articleInfo)
+    const articlesCopy = articles
+    articlesCopy.splice(articleIndex, 1)
+    setArticles(articlesCopy)
+
+    // DB: Update articles object in volume
+    await updateDoc(doc(db, 'volumes', volume), {
+      articles: articlesCopy
+    })
+
+    // DB: Add article to editions document
+    const editionsDoc = await getDoc(doc(db, 'volumes', volume, 'editions', edition))
+    const articlesInEdition = editionsDoc.data().articles
+    articlesInEdition.push(articleInfo)
+    await updateDoc(doc(db, 'volumes', volume, 'editions', edition), {
+      articles: articlesInEdition
+    })
+
+    // Instead of calling getArticles, just use editionsDoc
+    setIsEditionMoved(true)
+    setIsEditionPublished(editionsDoc.data().published)
+    setArticles(articlesInEdition)
   }
 
   async function publishEdition() {
@@ -652,6 +697,15 @@ function App() {
     setShowCreateModal(true)
   }
 
+  async function handleShowMoveEditionModal() {
+    setEditionList([])
+    const editionSnapshot = await getDocs(query(collection(db, 'volumes', volume, 'editions')))
+    const editionListCopy = []
+    editionSnapshot.forEach((doc) => { editionListCopy.push({value: doc.id, label: doc.id, id: doc.id}) })
+    setEditionList(editionListCopy)
+    setShowMoveEditionModal(true)
+  }
+
   function handleAddClick(event, blockIndex) {
     setShowAddBlock(blockIndex)
     setTargetAddBlock(event.target)
@@ -714,18 +768,20 @@ function App() {
             </Row>
             <Row className="mt-4">
               <ListGroup>
-                {isEditionPublished ? (
+                {edition && isEditionPublished ? (
                   <ListGroup.Item className="fst-italic" style={{'backgroundColor': '#e7e1ed'}} disabled>
                     Edition published!
                   </ListGroup.Item>
-                ) : (
+                ) : edition && articles && (
                   <ListGroup.Item style={{'backgroundColor': '#b484e8', 'cursor': 'pointer'}} onClick={() => setShowPublishEditionModal(true)}>
                     Publish edition
                   </ListGroup.Item>
                 )}
-                <ListGroup.Item style={{'backgroundColor': '#92e88e', 'cursor': 'pointer'}} onClick={() => handleShowCreateModal()}>
+                {articles && (
+                  <ListGroup.Item style={{'backgroundColor': '#92e88e', 'cursor': 'pointer'}} onClick={() => handleShowCreateModal()}>
                   + Create new article
-                </ListGroup.Item>
+                  </ListGroup.Item>
+                )}
 
                 {/** Modal for publishing edition */}
                 <Modal
@@ -866,6 +922,11 @@ function App() {
                   <Col sm={1}>
                     <Button variant="danger" onClick={() => setShowDeleteModal(true)}>Delete</Button>
                   </Col>
+                  {edition === '' && (
+                    <Col sm={3} style={{'margin-left': '15px'}}>
+                      <Button variant="secondary" onClick={() => handleShowMoveEditionModal()}>Move to Edition</Button>
+                    </Col> 
+                  )}
                   {isPublished ? 
                     <Col sm={1} style={{'margin-left': '15px', 'margin-top': '8px'}}>
                     <h5 className="fw-bold" style={{'color': '#61d461'}}>Published! </h5>
@@ -916,9 +977,35 @@ function App() {
                   </Modal.Body>
                   <Modal.Footer className="justify-content-center">
                     <Button variant="secondary" onClick={() => { setNotifyChecked(false); setSubHeadline(null); setShowPublishModal(false)}}>
-                      Cancel
+                      {isPublished ? "Exit" : "Cancel"}
                     </Button>
-                    <Button variant="primary" onClick={() => publishArticle()}>Publish</Button>
+                    {!isPublished && (
+                      <Button variant="primary" onClick={() => publishArticle()}>Publish</Button>
+                    )}
+                  </Modal.Footer>
+                </Modal>
+
+                <Modal
+                  show={showMoveEditionModal}
+                  onHide={() => setShowMoveEditionModal(false)}
+                  backdrop="static"
+                  keyboard={false}
+                >
+                  <Modal.Header closeButton>
+                    <Modal.Title>Move article to edition</Modal.Title>
+                  </Modal.Header>
+                  <Modal.Body>
+                    <Form.Group className="mb-3">
+                      <Form.Label>Choose edition</Form.Label>
+                      <CreatableSelect isClearable options={editionList} disabled={isLoading} isLoading={isLoading} onCreateOption={createEdition} onChange={(e) => setEdition(e.value)}  />
+                    </Form.Group>
+                      {isEditionMoved && 
+                        <p className="fw-bold fst-italic text-center" style={{'color': '#90EE90'}}>Edition has been moved!</p>
+                      }
+                  </Modal.Body>
+                  <Modal.Footer className="justify-content-center">
+                    <Button variant="secondary" onClick={() => { setIsEditionMoved(false); setShowMoveEditionModal(false)}}>Cancel</Button>
+                    <Button variant="primary" onClick={() => moveToEdition()}>Move article</Button>
                   </Modal.Footer>
                 </Modal>
 
