@@ -2,13 +2,14 @@ import { useState } from 'react'
 import { db, storage, auth, messaging, functions } from './firebase'
 import { getToken } from "firebase/messaging";
 import { httpsCallable } from "firebase/functions";
-import { doc, getDoc, updateDoc, query, collection, getDocs, where, addDoc, arrayUnion, deleteDoc } from 'firebase/firestore'
+import { doc, getDoc, setDoc, updateDoc, query, collection, getDocs, where, addDoc, arrayUnion, deleteDoc } from 'firebase/firestore'
 import { deleteObject, ref, uploadBytes, getDownloadURL } from 'firebase/storage'
 import { signInWithEmailAndPassword } from "firebase/auth";
 import { Col, Row, Container, Button, ListGroup, Form, Popover, ButtonGroup, Modal, Overlay } from 'react-bootstrap'
 import { v4 as uuidv4 } from 'uuid';
 import Select from 'react-select'
-import Toggle from 'react-toggle'
+import CreatableSelect from 'react-select/creatable'
+// import Toggle from 'react-toggle'
 import './App.css'
 import "react-toggle/style.css"
 
@@ -18,6 +19,7 @@ function App() {
   const [email, setEmail] = useState('')
   const [password, setPassword] = useState('')
   const [error, setError] = useState('')
+  const [isLoading, setIsLoading] = useState(false)
 
   const [editMode, setEditMode] = useState(null) // number corresponds to block position in content array
   const [editAuthorMode, setEditAuthorMode] = useState(false)
@@ -36,6 +38,7 @@ function App() {
   const [imageFile, setImageFile] = useState(null)
   const [credit, setCredit] = useState(null)
   const [isPublished, setIsPublished] = useState(null)
+  const [isEditionPublished, setIsEditionPublished] = useState(null)
 
   const [volumeList, setVolumeList] = useState(null)
   const [editionList, setEditionList] = useState(null)
@@ -55,6 +58,11 @@ function App() {
   const [showPublishModal, setShowPublishModal] = useState(false)
   const [notifyChecked, setNotifyChecked] = useState(false)
   const [subHeadline, setSubHeadline] = useState(null)
+
+  const [showPublishEditionModal, setShowPublishEditionModal] = useState(false)
+  const [notificationTitle, setNotificationTitle] = useState(null)
+  const [notificationSubtitle, setNotificationSubtitle] = useState(null)
+  const [notificationImage, setNotificationImage] = useState(null)
 
   async function signIn() {
     try {
@@ -92,10 +100,31 @@ function App() {
   async function getArticles() {
     if (volume !== '' && edition !== '') {
       const articleListSnap = await getDoc(doc(db, 'volumes', volume, 'editions', edition))
+      setIsEditionPublished(articleListSnap.data().published)
       setArticles(articleListSnap.data().articles)
     } else {
       console.log("Error! Invalid volume or edition number.")
     }
+  }
+
+  async function createEdition(editionNum) {
+    setIsLoading(true)
+
+    // LOCAL: Add to editionList
+    const editionListCopy = editionList
+    editionListCopy.push({value: editionNum, label: editionNum, id: editionNum})
+    setEditionList(editionListCopy)
+
+    // DB: Add new edition
+    await setDoc(doc(db, "volumes", volume, "editions", editionNum), {
+      articles: [],
+      published: false,
+    })
+
+    // LOCAL: Set edition to current edition
+    setEdition(editionNum)
+
+    setIsLoading(false)
   }
 
   async function showArticle(article) {
@@ -557,6 +586,63 @@ function App() {
     setIsPublished(true)
   }
 
+  async function publishEdition() {
+    // DB: Update edition document
+    const editionDocSnapshot = await getDoc(doc(db, 'volumes', volume, 'editions', edition))
+    const editionDocCopy = editionDocSnapshot.data()
+    const articleIds = []
+    for (let i = 0; i < editionDocCopy.articles.length; i++) {
+      editionDocCopy.articles[i].published = true
+      articleIds.push(editionDocCopy.articles[i].id.path.split('/').at(-1))
+    }
+    editionDocCopy.published = true
+    await setDoc(doc(db, 'volumes', volume, 'editions', edition), editionDocCopy)
+
+    // DB: Update article documents
+    await Promise.all(articleIds.map(async(articleId) => {
+      await updateDoc(doc(db, 'volumes', volume, 'articles', articleId), {
+        published: true
+      })
+    }))
+
+    // If notification requested, then trigger cloud function
+    if (notifyChecked) {
+      const topic = 'nobleman'
+
+      const message = {
+        notification: {
+          title: notificationTitle,
+          body: notificationSubtitle,
+          image: notificationImage,
+        },
+        topic: topic
+      };
+  
+      getToken(messaging, { vapidKey: process.env.FIREBASE_VAPID_KEY}).then((currentToken) => {
+        if (currentToken) {
+          console.log(currentToken)
+          const notifyArticle = httpsCallable(functions, 'notifyArticle')
+          notifyArticle({message, topic, registrationToken: currentToken})
+            .then((result) => {
+              console.log(result)
+
+              // When successful this should trigger some message on the modal saying it was successful
+            })
+            .catch((err) => {
+              console.log('An error occurred while triggering cloud function. ', err);
+            });
+        } else {
+          // Show permission request UI
+          console.log('No registration token available. Request permission to generate one.');
+        }
+      }).catch((err) => {
+        console.log('An error occurred while retrieving token. ', err);
+      });
+    }
+
+    setIsEditionPublished(true)
+  }
+
   async function handleShowCreateModal() {
     setAuthorList([])
     const authorSnapshot = await getDocs(query(collection(db, 'volumes', volume, 'authors')))
@@ -620,7 +706,7 @@ function App() {
               </Col>
               <Col>
                 <p><b>Editions</b></p>
-                <Select options={editionList} disabled={volume === ''} onChange={(e) => setEdition(e.value)} />
+                  <CreatableSelect isClearable options={editionList} disabled={(volume === '') || isLoading} isLoading={isLoading} onCreateOption={createEdition} onChange={(e) => setEdition(e.value)}  />
               </Col>
               <Col>
                 <Button className="mt-4" onClick={() => getArticles()}>See articles!</Button>
@@ -628,9 +714,62 @@ function App() {
             </Row>
             <Row className="mt-4">
               <ListGroup>
+                {isEditionPublished ? (
+                  <ListGroup.Item className="fst-italic" style={{'backgroundColor': '#e7e1ed'}} disabled>
+                    Edition published!
+                  </ListGroup.Item>
+                ) : (
+                  <ListGroup.Item style={{'backgroundColor': '#b484e8', 'cursor': 'pointer'}} onClick={() => setShowPublishEditionModal(true)}>
+                    Publish edition
+                  </ListGroup.Item>
+                )}
                 <ListGroup.Item style={{'backgroundColor': '#92e88e', 'cursor': 'pointer'}} onClick={() => handleShowCreateModal()}>
                   + Create new article
                 </ListGroup.Item>
+
+                {/** Modal for publishing edition */}
+                <Modal
+                  show={showPublishEditionModal}
+                  onHide={() => setShowPublishEditionModal(false)}
+                  backdrop="static"
+                  keyboard={false}
+                >
+                  <Modal.Header closeButton>
+                    <Modal.Title>Publish new edition</Modal.Title>
+                  </Modal.Header>
+                  <Modal.Body>
+                    <Form.Check type="checkbox" label="Send notification for article?" style={{'fontSize': '120%'}} onChange={(e) => setNotifyChecked(e.target.checked)} />
+                    <br />
+                    {notifyChecked && (
+                      <div style={{'fontSize': '120%'}}>
+                        <Form.Group className="mb-3">
+                          <Form.Label>Notification title</Form.Label>
+                          <Form.Control type="text" placeholder="Add a title here" onChange={(e) => setNotificationTitle(e.target.value)} />
+                        </Form.Group>
+                        <Form.Group className="mb-3">
+                          <Form.Label>Notification Subtitle (optional)</Form.Label>
+                          <Form.Control type="text" placeholder="Add a descriptive body here" onChange={(e) => setNotificationSubtitle(e.target.value)} />
+                        </Form.Group>
+                        <Form.Group className="mb-3">
+                          <Form.Label>Optional image (insert link below)</Form.Label>
+                          <Form.Control type="text" placeholder="Add a descriptive body here" onChange={(e) => setNotificationImage(e.target.value)} />
+                          {notificationImage && (
+                            <img src={notificationImage} alt="Preview" className='img-fluid' />
+                          )}
+                        </Form.Group>
+                        {isEditionPublished && 
+                          <p className="fw-bold fst-italic text-center" style={{'color': '#90EE90'}}>Edition has been published!</p>
+                        }
+                      </div>
+                    )}
+                  </Modal.Body>
+                  <Modal.Footer>
+                    <Button variant="secondary" onClick={() => {setNotificationTitle(null); setNotificationSubtitle(null); setNotificationImage(null); setNotifyChecked(null); setShowPublishEditionModal(false)}}>
+                      Cancel
+                    </Button>
+                    <Button variant="primary" disabled={(notificationTitle === '') || (notificationTitle === null)} onClick={() => publishEdition()}>Publish</Button>
+                  </Modal.Footer>
+                </Modal>
 
                 {/** Modal for initial article submission */}
                 <Modal
