@@ -515,27 +515,27 @@ function App() {
       setEditMode(null)
   }
 
-  async function handlePublishToggle(checked) {
-    // On create article
-    if (isPublished === null) setIsPublished(false)
+  // async function handlePublishToggle(checked) {
+  //   // On create article
+  //   if (isPublished === null) setIsPublished(false)
 
-    // Update articles
-    setIsPublished(checked)
-    const articleIndex = articles.indexOf(articles.find(elem => elem.id.path === `volumes/${volume}/articles/${currentArticleId}`))
-    const articlesCopy = articles
-    articlesCopy[articleIndex].published = checked
-    setArticles(articlesCopy)
+  //   // Update articles
+  //   setIsPublished(checked)
+  //   const articleIndex = articles.indexOf(articles.find(elem => elem.id.path === `volumes/${volume}/articles/${currentArticleId}`))
+  //   const articlesCopy = articles
+  //   articlesCopy[articleIndex].published = checked
+  //   setArticles(articlesCopy)
 
-    // Update article document on db
-    await updateDoc(doc(db, 'volumes', volume, 'articles', currentArticleId), {
-      published: checked
-    })
+  //   // Update article document on db
+  //   await updateDoc(doc(db, 'volumes', volume, 'articles', currentArticleId), {
+  //     published: checked
+  //   })
 
-    // Update edition document on db
-    await updateDoc(doc(db, 'volumes', volume, 'editions', edition), {
-      articles: articlesCopy
-    })
-  }
+  //   // Update edition document on db
+  //   await updateDoc(doc(db, 'volumes', volume, 'editions', edition), {
+  //     articles: articlesCopy
+  //   })
+  // }
 
   async function publishArticle() {
     // LOCAL: Update articles
