@@ -2,7 +2,7 @@ import { useState } from 'react'
 import { db, storage, auth, messaging, functions } from './firebase'
 import { getToken } from "firebase/messaging";
 import { httpsCallable } from "firebase/functions";
-import { doc, getDoc, setDoc, updateDoc, query, collection, getDocs, where, addDoc, arrayUnion, deleteDoc } from 'firebase/firestore'
+import { doc, getDoc, setDoc, updateDoc, query, collection, getDocs, where, addDoc, arrayUnion, deleteDoc, serverTimestamp } from 'firebase/firestore'
 import { deleteObject, ref, uploadBytes, getDownloadURL } from 'firebase/storage'
 import { signInWithEmailAndPassword } from "firebase/auth";
 import { Col, Row, Container, Button, ListGroup, Form, Popover, ButtonGroup, Modal, Overlay } from 'react-bootstrap'
@@ -643,12 +643,14 @@ function App() {
     editionDocCopy.published = true
     await setDoc(doc(db, 'volumes', volume, 'editions', edition), editionDocCopy)
 
-    // DB: Update article documents
-    await Promise.all(articleIds.map(async(articleId) => {
-      await updateDoc(doc(db, 'volumes', volume, 'articles', articleId), {
-        published: true
+    // DB: Update article documents in reverse order (to preserve order in app)
+    for (let j = articleIds.length - 1; j >= 0; j--) {
+      await updateDoc(doc(db, 'volumes', volume, 'articles', articleIds[j]), {
+        published: true,
+        datePublished: serverTimestamp()
       })
-    }))
+      await delay(2000) // 2-second delay to make order
+    }
 
     // If notification requested, then trigger cloud function
     if (notifyChecked) {
@@ -686,6 +688,11 @@ function App() {
     }
 
     setIsEditionPublished(true)
+  }
+
+  // Helper function for editionPublish
+  function delay(time) {
+    return new Promise(resolve => setTimeout(resolve, time));
   }
 
   async function handleShowCreateModal() {
@@ -794,7 +801,7 @@ function App() {
                     <Modal.Title>Publish new edition</Modal.Title>
                   </Modal.Header>
                   <Modal.Body>
-                    <Form.Check type="checkbox" label="Send notification for article?" style={{'fontSize': '120%'}} onChange={(e) => setNotifyChecked(e.target.checked)} />
+                    <Form.Check type="checkbox" label="Send notification for edition?" style={{'fontSize': '120%'}} onChange={(e) => setNotifyChecked(e.target.checked)} />
                     <br />
                     {notifyChecked && (
                       <div style={{'fontSize': '120%'}}>
