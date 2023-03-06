@@ -37,6 +37,7 @@ function App() {
   const [imageURL, setImageURL] = useState(null)
   const [imageFile, setImageFile] = useState(null)
   const [credit, setCredit] = useState(null)
+  const [caption, setCaption] = useState(null)
   const [isPublished, setIsPublished] = useState(null)
   const [isEditionPublished, setIsEditionPublished] = useState(null)
 
@@ -433,11 +434,21 @@ function App() {
     const url = await getDownloadURL(imageRef)
 
     const articleCopy = currentArticle
-    const contentWithNewQuote = [
-      ...currentArticle.content.slice(0, insertIndex),
-      { data: { url: url, credit: credit }, type: 'image'},
-      ...currentArticle.content.slice(insertIndex)
-    ]
+    let contentWithNewQuote
+    if (caption === null || caption === "") {
+      contentWithNewQuote = [
+        ...currentArticle.content.slice(0, insertIndex),
+        { data: { url: url, credit: credit, }, type: 'image'},
+        ...currentArticle.content.slice(insertIndex)
+      ]
+    } else {
+      contentWithNewQuote = [
+        ...currentArticle.content.slice(0, insertIndex),
+        { data: { url: url, credit: credit, caption: caption, }, type: 'image'},
+        ...currentArticle.content.slice(insertIndex)
+      ]
+    }
+
     articleCopy.content = contentWithNewQuote
     setCurrentArticle(articleCopy)
 
@@ -446,6 +457,7 @@ function App() {
     setImageFile(null)
     setImageURL(null)
     setCredit(null)
+    setCaption(null)
     setAddImage(null)
   }
 
@@ -1075,6 +1087,7 @@ function App() {
                       {imageURL && <img className="img-fluid" src={imageURL} alt="Nobleman"/>}
                       <input type="file" accept="image/*" onChange={onImageChange} />
                       <Form.Control type="text" className="mt-2" placeholder="Enter credit" onChange={(e) => setCredit(e.target.value)} />
+                      <Form.Control type="text" className="mt-2" placeholder="Enter caption" onChange={(e) => setCaption(e.target.value)} />
                       <Row className="mt-2 mb-3 justify-content-center">
                         <Col xs={2}>
                           <Button variant="success" onClick={() => insertImage(0)} disabled={imageURL === null || credit === (null || '')}>Add</Button>
@@ -1150,6 +1163,7 @@ function App() {
                               {imageURL && <img className="img-fluid" src={imageURL} alt="Nobleman"/>}
                               <input type="file" accept="image/*" onChange={onImageChange} />
                               <Form.Control type="text" className="mt-2" placeholder="Enter credit" onChange={(e) => setCredit(e.target.value)} />
+                              <Form.Control type="text" className="mt-2" placeholder="Enter caption" onChange={(e) => setCaption(e.target.value)} />
                               <Row className="mt-2 mb-3 justify-content-center">
                                 <Col xs={2}>
                                   <Button variant="success" onClick={() => insertImage(blockIndex + 1)} disabled={imageURL === null || credit === (null || '')}>Add</Button>
@@ -1173,6 +1187,11 @@ function App() {
                               {currentArticle.previewImageUrl === block.data.url && ' [PREVIEW IMAGE]'}
                             </span>
                           </p>
+                          {block.data.caption && (
+                              <p className="text-center mt-2">
+                                <b>Caption:</b> {block.data.caption}
+                              </p>
+                          )}
                           <Row className="mt-2 mb-3 justify-content-center">
                             <Col xs={2}>
                               <Button variant="success" disabled>Change Photo</Button>
@@ -1202,6 +1221,11 @@ function App() {
                             <span className="fw-bold" style={{'color': 'red'}}>
                               {currentArticle.previewImageUrl === block.data.url && ' [PREVIEW IMAGE]'}
                             </span></p>
+                            {block.data.caption && (
+                              <p className="text-center mt-2">
+                                <b>Caption:</b> {block.data.caption}
+                              </p>
+                            )}
                           </div>
                           <Row className="add-block justify-content-center mt-2">
                             <hr></hr>
@@ -1244,6 +1268,7 @@ function App() {
                                 {imageURL && <img className="img-fluid" src={imageURL} alt="Nobleman"/>}
                                 <input type="file" accept="image/*" onChange={onImageChange} />
                                 <Form.Control type="text" className="mt-2" placeholder="Enter credit" onChange={(e) => setCredit(e.target.value)} />
+                                <Form.Control type="text" className="mt-2" placeholder="Enter caption" onChange={(e) => setCaption(e.target.value)} />
                                 <Row className="mt-2 mb-3 justify-content-center">
                                   <Col xs={2}>
                                     <Button variant="success" onClick={() => insertImage(blockIndex + 1)} disabled={imageURL === null || credit === (null || '')}>Add</Button>
@@ -1318,6 +1343,7 @@ function App() {
                                 {imageURL && <img className="img-fluid" src={imageURL} alt="Nobleman"/>}
                                 <input type="file" accept="image/*" onChange={onImageChange} />
                                 <Form.Control type="text" className="mt-2" placeholder="Enter credit" onChange={(e) => setCredit(e.target.value)} />
+                                <Form.Control type="text" className="mt-2" placeholder="Enter caption" onChange={(e) => setCaption(e.target.value)} />
                                 <Row className="mt-2 mb-3 justify-content-center">
                                   <Col xs={2}>
                                     <Button variant="success" onClick={() => insertImage(blockIndex + 1)} disabled={imageURL === null || credit === (null || '')}>Add</Button>
