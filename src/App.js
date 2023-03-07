@@ -702,6 +702,20 @@ function App() {
     setIsEditionPublished(true)
   }
 
+  async function moveArticleUp(article) {
+    // LOCAL:
+    const articlesCopy = articles
+    const index = articlesCopy.findIndex(p => p.title === article.title);
+    articlesCopy.splice(index, 1) // Remove from array
+    articlesCopy.splice(index-1, 0, article) // Add to position before
+    setArticles(articlesCopy)
+
+    // DB:
+    await updateDoc(doc(db, 'volumes', volume, 'editions', edition), {
+      articles: articlesCopy
+    })
+  }
+
   // Helper function for editionPublish
   function delay(time) {
     return new Promise(resolve => setTimeout(resolve, time));
@@ -886,6 +900,13 @@ function App() {
                   <ListGroup.Item action onClick={() => showArticle(article)}>
                     <h5><b>{article.title}</b></h5>
                     <p>{article.author.name}</p>
+                    {articles.indexOf(article) !== 0 && (
+                      <div onClick={() => moveArticleUp(article)} style={{'width': '8%'}}>
+                        <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" strokeWidth={1.5} stroke="currentColor" className="w-6 h-6">
+                          <path strokeLinecap="round" strokeLinejoin="round" d="M15 11.25l-3-3m0 0l-3 3m3-3v7.5M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
+                        </svg>
+                      </div>
+                    )}
                   </ListGroup.Item>
                 )}
               </ListGroup>
