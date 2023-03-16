@@ -4,21 +4,20 @@ import { getToken } from "firebase/messaging";
 import { httpsCallable } from "firebase/functions";
 import { doc, getDoc, setDoc, updateDoc, query, collection, getDocs, where, addDoc, arrayUnion, deleteDoc, serverTimestamp } from 'firebase/firestore'
 import { deleteObject, ref, uploadBytes, getDownloadURL } from 'firebase/storage'
-import { signInWithEmailAndPassword } from "firebase/auth";
 import { Col, Row, Container, Button, ListGroup, Form, Popover, ButtonGroup, Modal, Overlay } from 'react-bootstrap'
 import { v4 as uuidv4 } from 'uuid';
 import Select from 'react-select'
 import CreatableSelect from 'react-select/creatable'
 // import Toggle from 'react-toggle'
+
+import SignIn from './SignIn';
+
 import './App.css'
 import "react-toggle/style.css"
 
 function App() {
 
   const [loggedIn, setLoggedIn] = useState(false)
-  const [email, setEmail] = useState('')
-  const [password, setPassword] = useState('')
-  const [error, setError] = useState('')
   const [isLoading, setIsLoading] = useState(false)
 
   const [editMode, setEditMode] = useState(null) // number corresponds to block position in content array
@@ -67,32 +66,6 @@ function App() {
   const [notificationTitle, setNotificationTitle] = useState(null)
   const [notificationSubtitle, setNotificationSubtitle] = useState(null)
   const [notificationImage, setNotificationImage] = useState(null)
-
-  async function signIn() {
-    try {
-      await signInWithEmailAndPassword(auth, email, password)
-
-      // Check if user is member of web staff
-      const webStaffSnapshot = await getDocs(query(collection(db, 'web_staff')))
-      const webStaffCopy = []
-      webStaffSnapshot.forEach((doc) => webStaffCopy.push(doc.data().email))
-      if (webStaffCopy.includes(email)) {
-        await getVolumes()
-        setLoggedIn(true)
-      } else {
-        console.log("Error! User is not a member of web staff")
-      }
-    } catch (error) {
-      setError(error.message)
-    }
-  }
-
-  async function getVolumes() {
-    const volumeSnapshot = await getDocs(query(collection(db, 'volumes')))
-    const volumeListCopy = []
-    volumeSnapshot.forEach((doc) => volumeListCopy.push({value: doc.id, label: doc.id, id: doc.id}))
-    setVolumeList(volumeListCopy)
-  }
 
   async function getEditions(volumeNum) {
     const editionSnapshot = await getDocs(query(collection(db, 'volumes', volumeNum, 'editions')))
@@ -527,28 +500,6 @@ function App() {
       setEditMode(null)
   }
 
-  // async function handlePublishToggle(checked) {
-  //   // On create article
-  //   if (isPublished === null) setIsPublished(false)
-
-  //   // Update articles
-  //   setIsPublished(checked)
-  //   const articleIndex = articles.indexOf(articles.find(elem => elem.id.path === `volumes/${volume}/articles/${currentArticleId}`))
-  //   const articlesCopy = articles
-  //   articlesCopy[articleIndex].published = checked
-  //   setArticles(articlesCopy)
-
-  //   // Update article document on db
-  //   await updateDoc(doc(db, 'volumes', volume, 'articles', currentArticleId), {
-  //     published: checked
-  //   })
-
-  //   // Update edition document on db
-  //   await updateDoc(doc(db, 'volumes', volume, 'editions', edition), {
-  //     articles: articlesCopy
-  //   })
-  // }
-
   async function publishArticle() {
     // LOCAL: Update articles
     const articleIndex = articles.indexOf(articles.find(elem => elem.id.path === `volumes/${volume}/articles/${currentArticleId}`))
@@ -746,33 +697,7 @@ function App() {
 
   if (!loggedIn) {
     return (
-      <>
-        <Row className="justify-content-md-center">
-          <Col className="text-center pt-3">
-            <h1>Nobleman Admin Dashboard</h1>
-            <p>Please sign in below using your Nobles email and pin to access the dashboard!</p>
-          </Col>
-        </Row>
-        <Row className="justify-content-md-center">
-          <Col md={6}>
-            <Form>
-              <Form.Group className="mb-3" controlId="formBasicEmail">
-                <Form.Label>Email address</Form.Label>
-                <Form.Control type="email" placeholder="Enter email" onChange={(e) => setEmail(e.target.value)} />
-              </Form.Group>
-
-              <Form.Group className="mb-3" controlId="formBasicPassword">
-                <Form.Label>Password</Form.Label>
-                <Form.Control type="password" placeholder="Password" onChange={(e) => setPassword(e.target.value)} />
-              </Form.Group>
-              <Button variant="primary" type="button" onClick={() => signIn()}>
-                Submit
-              </Button>
-              {error !== "" && <p className="fw-bold" style={{'color': 'red'}}>{error}</p>}
-            </Form>
-          </Col>
-        </Row>
-      </>
+      <SignIn setLoggedIn={setLoggedIn} setVolumeList={setVolumeList} />
     )
   } else {
     return (
