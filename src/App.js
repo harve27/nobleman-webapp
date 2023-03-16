@@ -1,17 +1,16 @@
 import { useState } from 'react'
-import { db, storage, auth, messaging, functions } from './firebase'
+import { db, storage, messaging, functions } from './firebase'
 import { getToken } from "firebase/messaging";
 import { httpsCallable } from "firebase/functions";
 import { doc, getDoc, setDoc, updateDoc, query, collection, getDocs, where, addDoc, arrayUnion, deleteDoc, serverTimestamp } from 'firebase/firestore'
-import { deleteObject, ref, uploadBytes, getDownloadURL } from 'firebase/storage'
-import { Col, Row, Container, Button, ListGroup, Form, Popover, ButtonGroup, Modal, Overlay } from 'react-bootstrap'
-import { v4 as uuidv4 } from 'uuid';
+import { deleteObject, ref } from 'firebase/storage'
+import { Col, Row, Container, Button, ListGroup, Form, Modal } from 'react-bootstrap'
 import Select from 'react-select'
 import CreatableSelect from 'react-select/creatable'
 // import Toggle from 'react-toggle'
 
 import SignIn from './SignIn';
-
+import AddBlock from './AddBlock';
 import './App.css'
 import "react-toggle/style.css"
 
@@ -23,20 +22,11 @@ function App() {
   const [editMode, setEditMode] = useState(null) // number corresponds to block position in content array
   const [editAuthorMode, setEditAuthorMode] = useState(false)
   const [editTitleMode, setEditTitleMode] = useState(false)
-
-
-  const [addParagraph, setAddParagraph] = useState(null)
-  const [addImage, setAddImage] = useState(null)
-  const [addQuote, setAddQuote] = useState(null)
   
   const [title, setTitle] = useState(null)
   const [author, setAuthor] = useState(null)
   const [paragraph, setParagraph] = useState(null)
   const [quote, setQuote] = useState(null)
-  const [imageURL, setImageURL] = useState(null)
-  const [imageFile, setImageFile] = useState(null)
-  const [credit, setCredit] = useState(null)
-  const [caption, setCaption] = useState(null)
   const [isPublished, setIsPublished] = useState(null)
   const [isEditionPublished, setIsEditionPublished] = useState(null)
 
@@ -51,8 +41,6 @@ function App() {
 
   const [showCreateModal, setShowCreateModal] = useState(false)
   const [showDeleteModal, setShowDeleteModal] = useState(false)
-  const [showAddBlock, setShowAddBlock] = useState(null)
-  const [targetAddBlock, setTargetAddBlock] = useState(null)
   const [authorList, setAuthorList] = useState([])
 
   const [showPublishModal, setShowPublishModal] = useState(false)
@@ -202,13 +190,6 @@ function App() {
     await updateDoc(doc(db, 'volumes', volume, 'authors', authorId), authorDocCopy)
   }
 
-  function onImageChange(e) {
-    const file = e.target.files[0]
-
-    setImageURL(URL.createObjectURL(file));
-    setImageFile(file)
-  }
-
   // Editing content functions
   async function editTitle() {
     const oldTitle = currentArticle.title
@@ -316,40 +297,6 @@ function App() {
     setEditMode(null)
   }
 
-  async function insertParagraph(insertIndex) {
-    // Format paragraphs (if multiple entered)
-    let separatedParagraphs = paragraph.split('\n')
-    separatedParagraphs = separatedParagraphs.filter(paragraph => paragraph !== "")
-    const formattedParagraphs = []
-    separatedParagraphs.forEach(text => {
-      let formattedText
-      if (text.startsWith("\t")) formattedText = text.slice(1)
-      else formattedText = text
-      formattedParagraphs.push({
-        data: {
-          text: formattedText
-        },
-        type: 'paragraph'
-      })
-    })
-
-    // Update currentArticle
-    const articleCopy = currentArticle
-    const contentWithNewParagraph = [
-      ...currentArticle.content.slice(0, insertIndex),
-      ...formattedParagraphs,
-      ...currentArticle.content.slice(insertIndex)
-    ]
-    articleCopy.content = contentWithNewParagraph
-    setCurrentArticle(articleCopy)
-
-    // Update article document on db
-    await updateDoc(doc(db, 'volumes', volume, 'articles', currentArticleId), currentArticle)
-    
-    setParagraph(null)
-    setAddParagraph(null)
-  }
-
   async function editQuote(blockIndex) {
     // Update currentArticle
     const articleCopy = currentArticle
@@ -374,65 +321,9 @@ function App() {
     setEditMode(null)
   }
 
-  async function insertQuote(insertIndex) {
-    // Update currentArticle
-    const articleCopy = currentArticle
-    const contentWithNewQuote = [
-      ...currentArticle.content.slice(0, insertIndex),
-      { data: { text: quote }, type: 'quote'},
-      ...currentArticle.content.slice(insertIndex)
-    ]
-    articleCopy.content = contentWithNewQuote
-    setCurrentArticle(articleCopy)
-
-    // Update article document on db
-    await updateDoc(doc(db, 'volumes', volume, 'articles', currentArticleId), currentArticle)
-    
-    setQuote(null)
-    setAddQuote(null)
-  }
-
   // TODO: Create editImage function (for now, delete and add), have ability to edit caption
   // async function editImage(blockIndex) { }
 
-  // TODO: Change security rules so that only authorized users can access it
-  async function insertImage(insertIndex) {
-    const imageName = uuidv4() // Random image name (uuid)
-    const imageRef = ref(storage, `noblemen/${volume}/${edition}/${currentArticleId}/${imageName}`)
-    
-    // Upload image to Firebase Storage
-    await uploadBytes(imageRef, imageFile)
-    
-    // Get download URL and update article document
-    const url = await getDownloadURL(imageRef)
-
-    const articleCopy = currentArticle
-    let contentWithNewQuote
-    if (caption === null || caption === "") {
-      contentWithNewQuote = [
-        ...currentArticle.content.slice(0, insertIndex),
-        { data: { url: url, credit: credit, }, type: 'image'},
-        ...currentArticle.content.slice(insertIndex)
-      ]
-    } else {
-      contentWithNewQuote = [
-        ...currentArticle.content.slice(0, insertIndex),
-        { data: { url: url, credit: credit, caption: caption, }, type: 'image'},
-        ...currentArticle.content.slice(insertIndex)
-      ]
-    }
-
-    articleCopy.content = contentWithNewQuote
-    setCurrentArticle(articleCopy)
-
-    await updateDoc(doc(db, 'volumes', volume, 'articles', currentArticleId), currentArticle)
-
-    setImageFile(null)
-    setImageURL(null)
-    setCredit(null)
-    setCaption(null)
-    setAddImage(null)
-  }
 
   async function deleteImage(blockIndex) {
     // Delete on storage (try/catch in case image doesn't exist)
@@ -690,11 +581,6 @@ function App() {
     setShowMoveEditionModal(true)
   }
 
-  function handleAddClick(event, blockIndex) {
-    setShowAddBlock(blockIndex)
-    setTargetAddBlock(event.target)
-  }
-
   if (!loggedIn) {
     return (
       <SignIn setLoggedIn={setLoggedIn} setVolumeList={setVolumeList} />
@@ -709,7 +595,7 @@ function App() {
           </Col>
         </Row>
         <Row className="h-100">
-          <Col md={4} style={{'borderRight': '1px solid gray', 'height':'800px', 'overflow': 'scroll'}}> {/** TODO: make height of page */}
+          <Col md={4} style={{'borderRight': '1px solid gray', 'height':'800px', 'overflow': 'scroll'}}>
             {/** Sort articles functionality */}
             <Row>
               <Col>
@@ -837,6 +723,8 @@ function App() {
               </ListGroup>
             </Row>
           </Col>
+
+          {/** CURRENT ARTICLE */}
           <Col className="p-4" md={8} style={{'backgroundColor': '#fcf1dc'}}>
             {Object.keys(currentArticle).length > 0 && (
               <Row>
@@ -870,18 +758,6 @@ function App() {
                     </Row>
                   </div>
                 ) : <h4 onClick={() => setEditAuthorMode(true)} className="fw-normal mb-3">{currentArticle.author.name}</h4>}
-                
-                {/* <Row>
-                  <Col sm={1}>
-                    <p>Published:</p>
-                  </Col>
-                  <Col sm={1} style={{'marginLeft': '20px'}}>
-                    <Toggle
-                    id='published_status'
-                    defaultChecked={isPublished}
-                    onChange={(e) => handlePublishToggle(e.target.checked)} />
-                  </Col>
-                </Row> */}
                 
                 <Row>
                   <Col sm={1}>
@@ -991,58 +867,18 @@ function App() {
                   </Modal.Footer>
                 </Modal>
 
-                {/** FIRST ADD BLOCK */}
-                <Row className="add-block justify-content-center mt-2">
-                  <hr></hr>
-                  <Col className="add-block-button" md={1}>
-                    <Overlay show={showAddBlock === 0} placement="right" target={targetAddBlock}>
-                      <Popover id="popover-basic">
-                        <Popover.Body>
-                          <ButtonGroup>
-                            <Button onClick={() => { setEditMode(null); setAddParagraph(0); setShowAddBlock(null); setTargetAddBlock(null) } }>Paragraph</Button>
-                            <Button onClick={() => { setEditMode(null); setAddImage(0); setShowAddBlock(null); setTargetAddBlock(null)} }>Image</Button>
-                            <Button onClick={() => { setEditMode(null); setAddQuote(0); setShowAddBlock(null); setTargetAddBlock(null)} }>Quote</Button>
-                          </ButtonGroup>
-                        </Popover.Body>
-                      </Popover>
-                    </Overlay>
-                    <Button style={{'borderRadius': '50%', 'margin-top': '-60px'}} onClick={(e) => handleAddClick(e, 0)} variant="info">+</Button>                          
-                  </Col>
-                </Row>
-                {addParagraph === 0 ? <>
-                  <Form.Control as="textarea" onChange={(e) => setParagraph(e.target.value)} style={{'height': '250px'}} />
-                  <Row className="mt-2 mb-3 justify-content-center">
-                      <Col xs={2}>
-                        <Button variant="success" onClick={() => insertParagraph(0)}>Add</Button>
-                      </Col>
-                      <Col xs={2}>
-                        <Button variant="primary" onClick={() => setAddParagraph(null)}>Cancel</Button>
-                      </Col>
-                    </Row>
-                </> : addQuote === 0 ? <>
-                  <Form.Control as="textarea" onChange={(e) => setQuote(e.target.value)}/>
-                  <Row className="mt-2 mb-3 justify-content-center">
-                      <Col xs={2}>
-                        <Button variant="success" onClick={() => insertQuote(0)}>Add</Button>
-                      </Col>
-                      <Col xs={2}>
-                        <Button variant="primary" onClick={() => setAddQuote(null)}>Cancel</Button>
-                      </Col>
-                    </Row>
-                </> : addImage === 0 && <>
-                      {imageURL && <img className="img-fluid" src={imageURL} alt="Nobleman"/>}
-                      <input type="file" accept="image/*" onChange={onImageChange} />
-                      <Form.Control type="text" className="mt-2" placeholder="Enter credit" onChange={(e) => setCredit(e.target.value)} />
-                      <Form.Control type="text" className="mt-2" placeholder="Enter caption" onChange={(e) => setCaption(e.target.value)} />
-                      <Row className="mt-2 mb-3 justify-content-center">
-                        <Col xs={2}>
-                          <Button variant="success" onClick={() => insertImage(0)} disabled={imageURL === null || credit === (null || '')}>Add</Button>
-                        </Col>
-                        <Col xs={2}>
-                          <Button variant="primary" onClick={() => { setAddImage(null); setImageURL(null); setImageFile(null) }}>Cancel</Button>
-                        </Col>
-                      </Row>
-                </>}
+                <AddBlock 
+                  blockIndex={-1}
+                  currentArticle={currentArticle}
+                  setCurrentArticle={setCurrentArticle}
+                  currentArticleId={currentArticleId}
+                  volume={volume}
+                  edition={edition}
+                  paragraph={paragraph}
+                  setParagraph={setParagraph}
+                  quote={quote}
+                  setQuote={setQuote}
+                  setEditMode={setEditMode} />
 
                 {/** CONTENT */}
                 {currentArticle.content.map((block) => {
@@ -1067,58 +903,19 @@ function App() {
                           </Row>
                         </>
                       ) : <>
-                        <p onClick={() => { setAddParagraph(null); setEditMode(blockIndex) }}>{block.data.text}</p>
-                        <Row className="add-block justify-content-center mt-2">
-                          <hr></hr>
-                          <Col className="add-block-button" md={1}>
-                            <Overlay show={showAddBlock === blockIndex + 1} placement="right" target={targetAddBlock}>
-                              <Popover id="popover-basic">
-                                <Popover.Body>
-                                  <ButtonGroup>
-                                    <Button onClick={() => { setEditMode(null); setAddParagraph(blockIndex + 1); setShowAddBlock(null); setTargetAddBlock(null) } }>Paragraph</Button>
-                                    <Button onClick={() => { setEditMode(null); setAddImage(blockIndex + 1); setShowAddBlock(null); setTargetAddBlock(null)} }>Image</Button>
-                                    <Button onClick={() => { setEditMode(null); setAddQuote(blockIndex + 1); setShowAddBlock(null); setTargetAddBlock(null)} }>Quote</Button>
-                                  </ButtonGroup>
-                                </Popover.Body>
-                              </Popover>
-                            </Overlay>
-                            <Button style={{'borderRadius': '50%', 'margin-top': '-60px'}} onClick={(e) => handleAddClick(e, blockIndex + 1)} variant="info">+</Button>                          
-                          </Col>
-                        </Row>
-                        {addParagraph === blockIndex + 1 ? <>
-                          <Form.Control as="textarea" style={{'height': '250px'}} onChange={(e) => setParagraph(e.target.value)}/>
-                          <Row className="mt-2 mb-3 justify-content-center">
-                              <Col xs={2}>
-                                <Button variant="success" onClick={() => insertParagraph(blockIndex + 1)}>Add</Button>
-                              </Col>
-                              <Col xs={2}>
-                                <Button variant="primary" onClick={() => setAddParagraph(null)}>Cancel</Button>
-                              </Col>
-                            </Row>
-                        </> : addQuote === blockIndex + 1 ? <>
-                          <Form.Control as="textarea" onChange={(e) => setQuote(e.target.value)}/>
-                          <Row className="mt-2 mb-3 justify-content-center">
-                              <Col xs={2}>
-                                <Button variant="success" onClick={() => insertQuote(blockIndex + 1)}>Add</Button>
-                              </Col>
-                              <Col xs={2}>
-                                <Button variant="primary" onClick={() => setAddQuote(null)}>Cancel</Button>
-                              </Col>
-                            </Row>
-                        </> : addImage === blockIndex + 1 && <>
-                              {imageURL && <img className="img-fluid" src={imageURL} alt="Nobleman"/>}
-                              <input type="file" accept="image/*" onChange={onImageChange} />
-                              <Form.Control type="text" className="mt-2" placeholder="Enter credit" onChange={(e) => setCredit(e.target.value)} />
-                              <Form.Control type="text" className="mt-2" placeholder="Enter caption" onChange={(e) => setCaption(e.target.value)} />
-                              <Row className="mt-2 mb-3 justify-content-center">
-                                <Col xs={2}>
-                                  <Button variant="success" onClick={() => insertImage(blockIndex + 1)} disabled={imageURL === null || credit === (null || '')}>Add</Button>
-                                </Col>
-                                <Col xs={2}>
-                                  <Button variant="primary" onClick={() => { setAddImage(null); setImageURL(null); setImageFile(null) }}>Cancel</Button>
-                                </Col>
-                              </Row>
-                        </>}
+                        <p onClick={() => { setEditMode(blockIndex) }}>{block.data.text}</p>
+                        <AddBlock 
+                          blockIndex={blockIndex}
+                          currentArticle={currentArticle}
+                          setCurrentArticle={setCurrentArticle}
+                          currentArticleId={currentArticleId}
+                          volume={volume}
+                          edition={edition}
+                          paragraph={paragraph}
+                          setParagraph={setParagraph}
+                          quote={quote}
+                          setQuote={setQuote}
+                          setEditMode={setEditMode} />
                       </>}
                     </div>
 
@@ -1173,57 +970,18 @@ function App() {
                               </p>
                             )}
                           </div>
-                          <Row className="add-block justify-content-center mt-2">
-                            <hr></hr>
-                            <Col className="add-block-button" md={1}>
-                              <Overlay show={showAddBlock === blockIndex + 1} placement="right" target={targetAddBlock}>
-                                <Popover id="popover-basic">
-                                  <Popover.Body>
-                                    <ButtonGroup>
-                                      <Button onClick={() => { setEditMode(null); setAddParagraph(blockIndex + 1); setShowAddBlock(null); setTargetAddBlock(null) } }>Paragraph</Button>
-                                      <Button onClick={() => { setEditMode(null); setAddImage(blockIndex + 1); setShowAddBlock(null); setTargetAddBlock(null)} }>Image</Button>
-                                      <Button onClick={() => { setEditMode(null); setAddQuote(blockIndex + 1); setShowAddBlock(null); setTargetAddBlock(null)} }>Quote</Button>
-                                    </ButtonGroup>
-                                  </Popover.Body>
-                                </Popover>
-                              </Overlay>
-                              <Button style={{'borderRadius': '50%', 'margin-top': '-60px'}} onClick={(e) => handleAddClick(e, blockIndex + 1)} variant="info">+</Button>                          
-                            </Col>
-                          </Row>
-                          {addParagraph === blockIndex + 1 ? <>
-                            <Form.Control as="textarea" style={{'height': '250px'}} onChange={(e) => setParagraph(e.target.value)}/>
-                            <Row className="mt-2 mb-3 justify-content-center">
-                                <Col xs={2}>
-                                  <Button variant="success" onClick={() => insertParagraph(blockIndex + 1)}>Add</Button>
-                                </Col>
-                                <Col xs={2}>
-                                  <Button variant="primary" onClick={() => setAddParagraph(null)}>Cancel</Button>
-                                </Col>
-                              </Row>
-                          </> : addQuote === blockIndex + 1 ? <>
-                            <Form.Control as="textarea" onChange={(e) => setQuote(e.target.value)}/>
-                            <Row className="mt-2 mb-3 justify-content-center">
-                                <Col xs={2}>
-                                  <Button variant="success" onClick={() => insertQuote(blockIndex + 1)}>Add</Button>
-                                </Col>
-                                <Col xs={2}>
-                                  <Button variant="primary" onClick={() => setAddQuote(null)}>Cancel</Button>
-                                </Col>
-                              </Row>
-                          </> : addImage === blockIndex + 1 && <>
-                                {imageURL && <img className="img-fluid" src={imageURL} alt="Nobleman"/>}
-                                <input type="file" accept="image/*" onChange={onImageChange} />
-                                <Form.Control type="text" className="mt-2" placeholder="Enter credit" onChange={(e) => setCredit(e.target.value)} />
-                                <Form.Control type="text" className="mt-2" placeholder="Enter caption" onChange={(e) => setCaption(e.target.value)} />
-                                <Row className="mt-2 mb-3 justify-content-center">
-                                  <Col xs={2}>
-                                    <Button variant="success" onClick={() => insertImage(blockIndex + 1)} disabled={imageURL === null || credit === (null || '')}>Add</Button>
-                                  </Col>
-                                  <Col xs={2}>
-                                    <Button variant="primary" onClick={() => { setAddImage(null); setImageURL(null); setImageFile(null) }}>Cancel</Button>
-                                  </Col>
-                                </Row>
-                          </>}
+                          <AddBlock 
+                            blockIndex={blockIndex}
+                            currentArticle={currentArticle}
+                            setCurrentArticle={setCurrentArticle}
+                            currentArticleId={currentArticleId}
+                            volume={volume}
+                            edition={edition}
+                            paragraph={paragraph}
+                            setParagraph={setParagraph}
+                            quote={quote}
+                            setQuote={setQuote}
+                            setEditMode={setEditMode} />
                         </>
                       )}
                     </div>
@@ -1248,57 +1006,18 @@ function App() {
                         </>
                       ) : <>
                           <p onClick={() => setEditMode(blockIndex)} className="fs-4 fst-italic">{block.data.text}</p>
-                          <Row className="add-block justify-content-center mt-2">
-                            <hr></hr>
-                            <Col className="add-block-button" md={1}>
-                              <Overlay show={showAddBlock === blockIndex + 1} placement="right" target={targetAddBlock}>
-                                <Popover id="popover-basic">
-                                  <Popover.Body>
-                                    <ButtonGroup>
-                                      <Button onClick={() => { setEditMode(null); setAddParagraph(blockIndex + 1); setShowAddBlock(null); setTargetAddBlock(null) } }>Paragraph</Button>
-                                      <Button onClick={() => { setEditMode(null); setAddImage(blockIndex + 1); setShowAddBlock(null); setTargetAddBlock(null)} }>Image</Button>
-                                      <Button onClick={() => { setEditMode(null); setAddQuote(blockIndex + 1); setShowAddBlock(null); setTargetAddBlock(null)} }>Quote</Button>
-                                    </ButtonGroup>
-                                  </Popover.Body>
-                                </Popover>
-                              </Overlay>
-                              <Button style={{'borderRadius': '50%', 'margin-top': '-60px'}} onClick={(e) => handleAddClick(e, blockIndex + 1)} variant="info">+</Button>                          
-                            </Col>
-                          </Row>
-                          {addParagraph === blockIndex + 1 ? <>
-                            <Form.Control as="textarea" style={{'height': '250px'}} onChange={(e) => setParagraph(e.target.value)}/>
-                            <Row className="mt-2 mb-3 justify-content-center">
-                                <Col xs={2}>
-                                  <Button variant="success" onClick={() => insertParagraph(blockIndex + 1)}>Add</Button>
-                                </Col>
-                                <Col xs={2}>
-                                  <Button variant="primary" onClick={() => setAddParagraph(null)}>Cancel</Button>
-                                </Col>
-                              </Row>
-                          </> : addQuote === blockIndex + 1 ? <>
-                            <Form.Control as="textarea" onChange={(e) => setQuote(e.target.value)}/>
-                            <Row className="mt-2 mb-3 justify-content-center">
-                                <Col xs={2}>
-                                  <Button variant="success" onClick={() => insertQuote(blockIndex + 1)}>Add</Button>
-                                </Col>
-                                <Col xs={2}>
-                                  <Button variant="primary" onClick={() => setAddQuote(null)}>Cancel</Button>
-                                </Col>
-                              </Row>
-                          </> : addImage === blockIndex + 1 && <>
-                                {imageURL && <img className="img-fluid" src={imageURL} alt="Nobleman"/>}
-                                <input type="file" accept="image/*" onChange={onImageChange} />
-                                <Form.Control type="text" className="mt-2" placeholder="Enter credit" onChange={(e) => setCredit(e.target.value)} />
-                                <Form.Control type="text" className="mt-2" placeholder="Enter caption" onChange={(e) => setCaption(e.target.value)} />
-                                <Row className="mt-2 mb-3 justify-content-center">
-                                  <Col xs={2}>
-                                    <Button variant="success" onClick={() => insertImage(blockIndex + 1)} disabled={imageURL === null || credit === (null || '')}>Add</Button>
-                                  </Col>
-                                  <Col xs={2}>
-                                    <Button variant="primary" onClick={() => { setAddImage(null); setImageURL(null); setImageFile(null) }}>Cancel</Button>
-                                  </Col>
-                                </Row>
-                          </>}
+                          <AddBlock 
+                            blockIndex={blockIndex}
+                            currentArticle={currentArticle}
+                            setCurrentArticle={setCurrentArticle}
+                            currentArticleId={currentArticleId}
+                            volume={volume}
+                            edition={edition}
+                            paragraph={paragraph}
+                            setParagraph={setParagraph}
+                            quote={quote}
+                            setQuote={setQuote}
+                            setEditMode={setEditMode} />
                         </>}
                     </div>
                   } else return null
