@@ -20,7 +20,6 @@ function App() {
   const [isLoading, setIsLoading] = useState(false)
 
   const [editMode, setEditMode] = useState(null) // number corresponds to block position in content array
-  const [editAuthorMode, setEditAuthorMode] = useState(false)
   const [editTitleMode, setEditTitleMode] = useState(false)
   
   const [title, setTitle] = useState(null)
@@ -248,52 +247,6 @@ function App() {
     setTitle(null)
     setEditTitleMode(false)
   }
-
-
-  // TODO: Make sure to change ID to represent new author if it is new; check at start in authors collection
-  async function editAuthor() {
-    const oldAuthor = currentArticle.author
-
-    // Find author ID for new author
-    const querySnapshot = await getDocs(query(collection(db, 'volumes', volume, 'authors'), where('name', '==', oldAuthor.name)))
-    
-    const newAuthorId = querySnapshot.docs[0].id
-
-    // TODO: Need some way to add the article to this author's doc and remove it from the other author's doc. Is this getting too complicated?
-
-    setCurrentArticle({
-      ...currentArticle,
-      author: {
-        name: author,
-        id: `volumes/${volume}/authors/${newAuthorId}`,
-      } 
-    })
-
-    console.log(currentArticle)
-
-    // Update articles state
-    const articlesCopy = articles
-
-    articlesCopy.find(x => x.author.name === oldAuthor.name).author.name = author
-    setArticles(articlesCopy)
-
-    // Update edition document on db
-    await updateDoc(doc(db, 'volumes', volume, 'editions', edition), {
-      articles: articles
-    })
-
-    // Update article document on db
-    await updateDoc(doc(db, 'volumes', volume, 'articles', currentArticleId), {
-      author: {
-        name: author,
-        id: `volumes/${volume}/authors/${newAuthorId}`,
-      }
-    })
-
-    setAuthor(null)
-    setEditAuthorMode(false)
-  }
-
 
   async function editParagraph(blockIndex) {
     // Update currentArticle
@@ -766,20 +719,7 @@ function App() {
                   </div>
                 ) : <h2 onClick={() => setEditTitleMode(true)} className="fw-bold fst-italic">{currentArticle.title}</h2>}
                 
-                {/** AUTHOR */}
-                {editAuthorMode ? (
-                  <div className="mb-3">
-                    <Form.Control type="text" onChange={(e) => setAuthor(e.target.value)} defaultValue={currentArticle.author.name}></Form.Control>
-                    <Row className="justify-content-start mt-2 mb-2">
-                      <Col md={1}>
-                        <Button variant="success" onClick={() => editAuthor()}>Submit</Button>
-                      </Col>
-                      <Col md={1} style={{'margin-left': '20px'}}>
-                        <Button variant="primary" onClick={() => setEditAuthorMode(false)}>Cancel</Button>
-                      </Col>
-                    </Row>
-                  </div>
-                ) : <h4 onClick={() => setEditAuthorMode(true)} className="fw-normal mb-3">{currentArticle.author.name}</h4>}
+               <h4 className="fw-normal mb-3">{currentArticle.author.name}</h4>
                 
                 <Row>
                   <Col sm={1}>
