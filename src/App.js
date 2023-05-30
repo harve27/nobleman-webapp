@@ -75,6 +75,28 @@ function App() {
     }
   }
 
+  async function createAuthor(authorName) {
+    setIsLoading(true)
+
+    // LOCAL: Add to authorList
+    const authorListCopy = authorList
+    authorListCopy.push({value: authorName, label: authorName, id: authorName})
+    setAuthorList(authorListCopy)
+
+    const authorDoc = {
+      articles: [],
+      name: authorName
+    }
+
+    // DB: Add new edition
+    await addDoc(collection(db, "volumes", volume, "authors"), authorDoc)
+
+    // LOCAL: Set author to current author
+    setAuthor(authorName)
+
+    setIsLoading(false)
+  }
+
   async function createEdition(editionNum) {
     setIsLoading(true)
 
@@ -695,7 +717,7 @@ function App() {
                         className="mb-3"
                       >
                         <Form.Label>Author</Form.Label>
-                        <Select options={authorList} onChange={(e) => setAuthor(e.value)}/>
+                        <CreatableSelect isClearable options={authorList} disabled={(volume === '') || isLoading} isLoading={isLoading} onCreateOption={createAuthor} onChange={(e) => setAuthor(e.value)}  />
                       </Form.Group>
                     </Form>
                   </Modal.Body>
