@@ -96,6 +96,26 @@ function App() {
     setIsLoading(false)
   }
 
+  async function createVolume(volumeNum) {
+    setIsLoading(true)
+
+    // LOCAL: Add to volumeList
+    const volumeListCopy = volumeList
+    volumeListCopy.push({value: volumeNum, label: volumeNum, id: volumeNum})
+    setVolumeList(volumeListCopy)
+
+    // DB: Add new edition
+    await setDoc(doc(db, "volumes", volumeNum), {
+      articles: [],
+      published: false,
+    })
+
+    // LOCAL: Set volume to current volume
+    setVolume(volumeNum)
+
+    setIsLoading(false)
+  }
+
   async function createEdition(editionNum) {
     setIsLoading(true)
 
@@ -575,7 +595,7 @@ function App() {
             <Row>
               <Col>
                 <p><b>Volumes</b></p>
-                <Select options={volumeList} onChange={async(e) => { setEdition(''); await getEditions(e.value); setVolume(e.value)}} />
+                <CreatableSelect isClearable options={volumeList} disabled={isLoading} isLoading={isLoading} onCreateOption={createVolume} onChange={async(e) => { setEdition(''); await getEditions(e.value); setVolume(e.value)}}  />
               </Col>
               <Col>
                 <p><b>Editions</b></p>
